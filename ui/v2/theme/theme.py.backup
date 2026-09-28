@@ -1,0 +1,359 @@
+from PySide6.QtWidgets import QApplication
+
+
+APP_STYLESHEET = """
+
+/* ============================================================
+   AIO TOOLBOX
+   LOCKED LIGHT WINDOWS UI
+   ============================================================ */
+
+QMainWindow {
+    background: #F6F8FB;
+}
+
+QWidget {
+    font-family: "Segoe UI";
+    color: #17233C;
+}
+
+
+/* ============================================================
+   HEADER
+   ============================================================ */
+
+#header {
+    background: #FFFFFF;
+    border-bottom: 1px solid #E1E7EF;
+}
+
+#brandIcon {
+    background: #2F80ED;
+    border-radius: 16px;
+}
+
+#brandTitle {
+    color: #123A72;
+    font-size: 30px;
+    font-weight: 700;
+}
+
+#brandSubtitle {
+    color: #7890AE;
+    font-size: 14px;
+}
+
+#searchContainer {
+    background: #F8FAFD;
+    border: 1px solid #D8E2EF;
+    border-radius: 12px;
+}
+
+#searchIcon {
+    background: transparent;
+}
+
+#searchInput {
+    background: transparent;
+    border: none;
+    color: #26344D;
+    font-size: 15px;
+    padding: 0;
+}
+
+#searchInput:focus {
+    border: none;
+    outline: none;
+}
+
+#searchShortcut {
+    background: #FFFFFF;
+    border: 1px solid #D6E0EC;
+    border-radius: 8px;
+    color: #5F718D;
+    font-size: 12px;
+    font-weight: 500;
+}
+
+#headerButton {
+    background: #F8FAFD;
+    border: none;
+    border-radius: 23px;
+}
+
+#headerButton:hover {
+    background: #EEF4FB;
+}
+
+#versionLabel {
+    color: #70839E;
+    font-size: 12px;
+}
+
+
+/* ============================================================
+   DATABASE
+   ============================================================ */
+
+#databaseHeaderButton {
+    background: #FFFFFF;
+    border: 1px solid #B9DEC8;
+    border-radius: 12px;
+    color: #16803C;
+    font-size: 14px;
+    font-weight: 600;
+}
+
+#databaseHeaderButton:hover {
+    background: #F4FBF7;
+}
+
+
+/* ============================================================
+   SIDEBAR
+   ============================================================ */
+
+#sidebar {
+    background: #FFFFFF;
+    border-right: 1px solid #E3E8EF;
+}
+
+#navigationItem {
+    background: transparent;
+    border: none;
+    border-radius: 10px;
+    color: #17304F;
+    font-size: 15px;
+    font-weight: 500;
+    text-align: left;
+}
+
+#navigationItem:hover {
+    background: #F2F6FB;
+}
+
+#navigationItem[selected="true"] {
+    background: #2F86E8;
+    color: #FFFFFF;
+}
+
+#navigationItem[selected="true"]:hover {
+    background: #2F86E8;
+}
+
+#navigationIcon {
+    background: transparent;
+}
+
+#navigationText {
+    background: transparent;
+    color: inherit;
+    font-size: 15px;
+}
+
+#sunsoftBrand {
+    color: #1976E8;
+    font-size: 24px;
+    font-weight: 800;
+}
+
+#sunsoftSubtitle {
+    color: #7890AE;
+    font-size: 12px;
+}
+
+
+/* ============================================================
+   CONTENT
+   ============================================================ */
+
+#contentArea {
+    background: #F6F8FB;
+}
+
+#contentArea QScrollArea {
+    background: transparent;
+    border: none;
+}
+
+#contentArea QScrollArea > QWidget {
+    background: transparent;
+}
+
+
+/* ============================================================
+   WELCOME BANNER
+   ============================================================ */
+
+#welcomeBanner {
+    background: #E8F4FF;
+    border: 1px solid #CDE4FA;
+    border-radius: 16px;
+}
+
+#welcomeEyebrow {
+    color: #2F80ED;
+    font-size: 13px;
+    font-weight: 700;
+}
+
+#welcomeTitle {
+    color: #123A72;
+    font-size: 40px;
+    font-weight: 700;
+}
+
+#welcomeSubtitle {
+    color: #17477F;
+    font-size: 20px;
+    font-weight: 400;
+}
+
+#welcomeDescription {
+    color: #5C789D;
+    font-size: 14px;
+}
+
+#welcomeVisual {
+    background: #DCECFB;
+    border: 1px solid #C6DDF5;
+    border-radius: 18px;
+}
+
+#welcomeIconBox {
+    background: transparent;
+    border: none;
+}
+
+#welcomeIcon {
+    background: #2F80ED;
+    border-radius: 22px;
+}
+
+#welcomeCheck {
+    color: #3971B5;
+    font-size: 14px;
+    font-weight: 600;
+}
+
+#welcomeTomorrow {
+    color: #8AA7C8;
+    font-size: 12px;
+    font-style: italic;
+}
+
+
+/* ============================================================
+   DASHBOARD PANELS
+   ============================================================ */
+
+#infoPanel {
+    background: #FFFFFF;
+    border: 1px solid #DDE5EF;
+    border-radius: 14px;
+}
+
+#panelTitle {
+    color: #14213D;
+    font-size: 18px;
+    font-weight: 700;
+}
+
+#panelLabel {
+    color: #6B83A3;
+    font-size: 14px;
+}
+
+#panelValue {
+    color: #19375E;
+    font-size: 14px;
+    font-weight: 500;
+}
+
+#viewLogs {
+    color: #2F80ED;
+    font-size: 14px;
+    font-weight: 600;
+}
+
+#activityIndicator {
+    color: #18B968;
+    font-size: 10px;
+}
+
+#activityTime {
+    color: #55759E;
+    font-size: 13px;
+    font-weight: 600;
+}
+
+#activityDescription {
+    color: #405875;
+    font-size: 14px;
+}
+
+
+/* ============================================================
+   SCROLLBAR
+   ============================================================ */
+
+QScrollBar:vertical {
+    background: transparent;
+    width: 8px;
+    margin: 4px 2px;
+}
+
+QScrollBar::handle:vertical {
+    background: #CBD4E0;
+    border-radius: 4px;
+    min-height: 40px;
+}
+
+QScrollBar::handle:vertical:hover {
+    background: #AEBBCC;
+}
+
+QScrollBar::add-line:vertical,
+QScrollBar::sub-line:vertical {
+    height: 0;
+}
+
+QScrollBar::add-page:vertical,
+QScrollBar::sub-page:vertical {
+    background: transparent;
+}
+
+
+/* ============================================================
+   STATUS BAR
+   ============================================================ */
+
+#statusBar {
+    background: #FFFFFF;
+    border-top: 1px solid #E2E7EF;
+}
+
+#statusIndicator {
+    background: #20B15A;
+    border-radius: 8px;
+}
+
+#statusText {
+    color: #526176;
+    font-size: 13px;
+}
+
+#dateTime {
+    color: #526176;
+    font-size: 13px;
+}
+
+"""
+
+
+def apply_theme(
+    application: QApplication,
+) -> None:
+    application.setStyleSheet(
+        APP_STYLESHEET
+    )

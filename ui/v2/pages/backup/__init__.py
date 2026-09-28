@@ -1,0 +1,1 @@
+from ui.v2.pages.backup.backup_manager_page import BackupManagerPage

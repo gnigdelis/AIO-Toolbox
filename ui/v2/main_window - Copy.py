@@ -1,0 +1,1243 @@
+﻿from pathlib import Path
+
+from PySide6.QtCore import QDateTime, QSize, Qt, QTimer
+from PySide6.QtGui import QIcon, QPixmap
+from PySide6.QtWidgets import (
+    QApplication,
+    QDialog,
+    QFrame,
+    QHBoxLayout,
+    QLabel,
+    QLineEdit,
+    QMainWindow,
+    QMessageBox,
+    QPushButton,
+    QSizePolicy,
+    QStackedWidget,
+    QVBoxLayout,
+    QWidget,
+)
+
+from core.database.database_context import database_context
+
+from ui.v2.dashboard.dashboard_page import DashboardPage
+from ui.v2.dialogs.database_selector import DatabaseSelector
+
+from ui.v2.pages.mydata.mydata_page import MyDataPage
+from ui.v2.pages.pending_order.pending_order_page import PendingOrderPage
+from ui.v2.pages.change_date.change_date_page import ChangeDatePage
+from ui.v2.pages.move_sales_to_hist.move_sales_to_hist_page import (
+    MoveSalesToHistPage,
+)
+from ui.v2.pages.sql_tools.sql_tools_page import SQLToolsPage
+from ui.v2.pages.network_tools.network_tools_page import (
+    NetworkToolsPage,
+)
+from ui.v2.pages.backup.backup_manager_page import BackupManagerPage
+
+from ui.v2.theme.svg_icons import icon, pixmap
+from ui.v2.theme.theme import apply_theme
+
+
+APP_ICON_PATH = Path(
+    "assets/branding/window/app.ico"
+)
+
+APP_LOGO_PATH = Path(
+    "assets/branding/logo/logo.png"
+)
+
+
+def resource_path(path: Path) -> str:
+    """
+    Return an application resource path.
+
+    Works both when running from source and
+    when packaged with PyInstaller.
+    """
+    import os
+    import sys
+
+    if hasattr(sys, "_MEIPASS"):
+        base_path = Path(sys._MEIPASS)
+    else:
+        base_path = Path.cwd()
+
+    return os.path.join(
+        str(base_path),
+        str(path),
+    )
+
+
+class MainWindow(QMainWindow):
+    """
+    Main AIO Toolbox application window.
+    """
+
+    WINDOW_MIN_WIDTH = 1024
+    WINDOW_MIN_HEIGHT = 768
+
+    WINDOW_DEFAULT_WIDTH = 1565
+    WINDOW_DEFAULT_HEIGHT = 990
+
+    SIDEBAR_WIDTH = 297
+    HEADER_HEIGHT = 78
+    STATUSBAR_HEIGHT = 42
+
+    # The top bar reserves the same horizontal space as the sidebar,
+    # while the actual large branding is displayed inside the sidebar.
+    HEADER_LEFT_SPACE = SIDEBAR_WIDTH
+
+    def __init__(
+        self,
+    ) -> None:
+        super().__init__()
+
+        self._navigation_buttons: list[
+            QPushButton
+        ] = []
+
+        self._setup_window()
+        self._build_ui()
+        self.showMaximized()
+        self._connect_database_context()
+        self._start_clock()
+
+    # ================================================================
+    # Window
+    # ================================================================
+
+    def _setup_window(
+        self,
+    ) -> None:
+        self.setWindowTitle(
+            "AIO Toolbox"
+        )
+
+        self.setWindowIcon(
+            QIcon(
+                resource_path(
+                    APP_ICON_PATH
+                )
+            )
+        )
+
+        self.setMinimumSize(
+            self.WINDOW_MIN_WIDTH,
+            self.WINDOW_MIN_HEIGHT,
+        )
+
+        self.resize(
+            self.WINDOW_DEFAULT_WIDTH,
+            self.WINDOW_DEFAULT_HEIGHT,
+        )
+
+    # ================================================================
+    # Main UI
+    # ================================================================
+
+    def _build_ui(
+        self,
+    ) -> None:
+        root = QWidget()
+        root.setObjectName(
+            "root"
+        )
+
+        root_layout = QVBoxLayout(
+            root
+        )
+
+        root_layout.setContentsMargins(
+            0,
+            0,
+            0,
+            0,
+        )
+
+        root_layout.setSpacing(
+            0
+        )
+
+        root_layout.addWidget(
+            self._create_header()
+        )
+
+        body = QWidget()
+
+        body_layout = QHBoxLayout(
+            body
+        )
+
+        body_layout.setContentsMargins(
+            0,
+            0,
+            0,
+            0,
+        )
+
+        body_layout.setSpacing(
+            0
+        )
+
+        body_layout.addWidget(
+            self._create_sidebar()
+        )
+
+        body_layout.addWidget(
+            self._create_content_area(),
+            1,
+        )
+
+        root_layout.addWidget(
+            body,
+            1,
+        )
+
+        root_layout.addWidget(
+            self._create_status_bar()
+        )
+
+        self.setCentralWidget(
+            root
+        )
+
+    # ================================================================
+    # Header
+    # ================================================================
+
+    def _create_header(
+        self,
+    ) -> QWidget:
+        header = QFrame()
+        header.setObjectName("header")
+        header.setFixedHeight(self.HEADER_HEIGHT)
+
+        layout = QHBoxLayout(header)
+        layout.setContentsMargins(0, 0, 22, 0)
+        layout.setSpacing(10)
+
+        # ------------------------------------------------------------
+        # Branding
+        #
+        # The branding area has exactly the same width as the sidebar.
+        # This keeps the logo centered over the sidebar and makes the
+        # search bar start immediately after that same boundary.
+        # ------------------------------------------------------------
+
+        branding_container = QFrame()
+        branding_container.setObjectName("headerBranding")
+        branding_container.setFixedWidth(self.SIDEBAR_WIDTH)
+        branding_container.setFixedHeight(self.HEADER_HEIGHT)
+
+        branding_layout = QHBoxLayout(branding_container)
+        branding_layout.setContentsMargins(0, 0, 0, 0)
+        branding_layout.setSpacing(0)
+
+        logo_label = QLabel()
+        logo_label.setObjectName("headerLogo")
+        logo_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
+        logo_label.setFixedSize(
+            self.SIDEBAR_WIDTH,
+            self.HEADER_HEIGHT,
+        )
+
+        logo_path = Path(
+            resource_path(APP_LOGO_PATH)
+        )
+
+        if logo_path.exists():
+            logo_pixmap = QPixmap(str(logo_path))
+            if not logo_pixmap.isNull():
+                logo_label.setPixmap(
+                    logo_pixmap.scaled(
+                        235,
+                        62,
+                        Qt.AspectRatioMode.KeepAspectRatio,
+                        Qt.TransformationMode.SmoothTransformation,
+                    )
+                )
+            else:
+                self._set_header_branding_fallback(logo_label)
+        else:
+            self._set_header_branding_fallback(logo_label)
+
+        branding_layout.addWidget(logo_label)
+        layout.addWidget(branding_container)
+
+        # ------------------------------------------------------------
+        # Search
+        # ------------------------------------------------------------
+
+        search_container = QFrame()
+        search_container.setObjectName("searchContainer")
+        search_container.setFixedHeight(42)
+        search_container.setMinimumWidth(300)
+        search_container.setMaximumWidth(720)
+        search_container.setSizePolicy(
+            QSizePolicy.Policy.Expanding,
+            QSizePolicy.Policy.Fixed,
+        )
+
+        search_layout = QHBoxLayout(search_container)
+        search_layout.setContentsMargins(10, 0, 10, 0)
+        search_layout.setSpacing(5)
+
+        search_icon = QLabel()
+        search_icon.setObjectName("searchIcon")
+        search_icon.setFixedSize(22, 22)
+        search_icon.setAlignment(Qt.AlignmentFlag.AlignCenter)
+        search_icon.setPixmap(
+            pixmap(
+                "search",
+                "#526176",
+                19,
+            )
+        )
+
+        search_input = QLineEdit()
+        search_input.setObjectName("searchInput")
+        search_input.setPlaceholderText(
+            "Search tools, tasks, commands..."
+        )
+        search_input.setFrame(False)
+
+        search_layout.addWidget(search_icon)
+        search_layout.addWidget(search_input)
+
+        layout.addWidget(search_container, 1)
+        layout.addSpacing(18)
+
+        # ------------------------------------------------------------
+        # Database button
+        # ------------------------------------------------------------
+
+        self.database_button = QPushButton(
+            "●  DB: Not Connected"
+        )
+        self.database_button.setObjectName(
+            "databaseHeaderButton"
+        )
+        self.database_button.setMinimumWidth(145)
+        self.database_button.setMaximumWidth(205)
+        self.database_button.setFixedHeight(38)
+        self.database_button.setCursor(
+            Qt.CursorShape.PointingHandCursor
+        )
+        self.database_button.setIcon(
+            icon(
+                "database",
+                "#40506A",
+                18,
+            )
+        )
+        self.database_button.setIconSize(
+            QSize(18, 18)
+        )
+        self.database_button.clicked.connect(
+            self._open_database_selector
+        )
+
+        layout.addWidget(self.database_button)
+
+        # ------------------------------------------------------------
+        # Help
+        # ------------------------------------------------------------
+
+        help_button = self._create_header_button("help")
+        help_button.setToolTip("Help")
+        layout.addWidget(help_button)
+
+        # ------------------------------------------------------------
+        # Settings
+        # ------------------------------------------------------------
+
+        settings_button = self._create_header_button("settings")
+        settings_button.setToolTip("Settings")
+        layout.addWidget(settings_button)
+
+        layout.addSpacing(5)
+
+        # ------------------------------------------------------------
+        # Version
+        # ------------------------------------------------------------
+
+        version = QLabel("v1.0.0")
+        version.setObjectName("versionLabel")
+        version.setAlignment(
+            Qt.AlignmentFlag.AlignRight
+            | Qt.AlignmentFlag.AlignVCenter
+        )
+        version.setMinimumWidth(48)
+        layout.addWidget(version)
+
+        return header
+
+    def _set_header_branding_fallback(
+        self,
+        logo_label: QLabel,
+    ) -> None:
+        fallback = QFrame()
+        fallback_layout = QHBoxLayout(fallback)
+        fallback_layout.setContentsMargins(0, 0, 0, 0)
+        fallback_layout.setSpacing(10)
+
+        icon_label = QLabel()
+        icon_label.setFixedSize(54, 54)
+        icon_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
+        icon_label.setPixmap(
+            pixmap(
+                "toolbox",
+                "#1976D2",
+                50,
+            )
+        )
+
+        text_container = QFrame()
+        text_layout = QVBoxLayout(text_container)
+        text_layout.setContentsMargins(0, 0, 0, 0)
+        text_layout.setSpacing(0)
+
+        title = QLabel("AIO Toolbox")
+        title.setObjectName("headerBrandingTitle")
+
+        subtitle = QLabel("All-in-One Support Tools")
+        subtitle.setObjectName("headerBrandingSubtitle")
+
+        text_layout.addWidget(title)
+        text_layout.addWidget(subtitle)
+
+        fallback_layout.addWidget(icon_label)
+        fallback_layout.addWidget(text_container)
+
+        logo_label.setLayout(fallback_layout)
+
+    def _create_header_button(
+        self,
+        icon_name: str,
+    ) -> QPushButton:
+        button = QPushButton()
+        button.setObjectName("headerButton")
+        button.setFixedSize(38, 38)
+        button.setCursor(
+            Qt.CursorShape.PointingHandCursor
+        )
+        button.setIcon(
+            icon(
+                icon_name,
+                "#40506A",
+                20,
+            )
+        )
+        button.setIconSize(
+            QSize(20, 20)
+        )
+        return button
+
+    # ================================================================
+    # Database
+    # ================================================================
+
+    def _connect_database_context(
+        self,
+    ) -> None:
+        database_context.database_changed.connect(
+            self._database_changed
+        )
+
+        current = (
+            database_context.active()
+        )
+
+        if current:
+            self._database_changed(
+                current
+            )
+        else:
+            self._set_database_disconnected()
+
+    def _open_database_selector(
+        self,
+    ) -> None:
+        dialog = DatabaseSelector(
+            self
+        )
+
+        # Same AIO Toolbox application icon.
+        dialog.setWindowIcon(
+            self.windowIcon()
+        )
+
+        if (
+            dialog.exec()
+            != QDialog.DialogCode.Accepted
+        ):
+            return
+
+        selected_udl = (
+            dialog.selected_udl
+        )
+
+        if not selected_udl:
+            return
+
+        try:
+            database = (
+                database_context.select(
+                    selected_udl
+                )
+            )
+
+            self._database_changed(
+                database
+            )
+
+            message_box = QMessageBox(
+                self
+            )
+
+            message_box.setWindowIcon(
+                self.windowIcon()
+            )
+
+            message_box.setIcon(
+                QMessageBox.Icon.Information
+            )
+
+            message_box.setWindowTitle(
+                "Database Connected"
+            )
+
+            message_box.setText(
+                "Database connection established successfully."
+            )
+
+            message_box.setInformativeText(
+                f"Database:\n"
+                f"{database.get('name') or '-'}"
+                f"\n\n"
+                f"Server:\n"
+                f"{database.get('server') or '-'}"
+            )
+
+            message_box.exec()
+
+        except Exception as exc:
+            self._set_database_disconnected()
+
+            message_box = QMessageBox(
+                self
+            )
+
+            message_box.setWindowIcon(
+                self.windowIcon()
+            )
+
+            message_box.setIcon(
+                QMessageBox.Icon.Critical
+            )
+
+            message_box.setWindowTitle(
+                "Database Error"
+            )
+
+            message_box.setText(
+                "The selected UDL could not be loaded."
+            )
+
+            message_box.setInformativeText(
+                f"UDL:\n"
+                f"{selected_udl}"
+                f"\n\n"
+                f"Error:\n"
+                f"{exc}"
+            )
+
+            message_box.exec()
+
+    def _database_changed(
+        self,
+        database: dict | None,
+    ) -> None:
+        if not database:
+            self._set_database_disconnected()
+            return
+
+        database_name = (
+            database.get("name")
+            or "Unknown"
+        )
+
+        self._set_database_button_state(
+            True,
+            database_name,
+        )
+
+        self.database_button.setToolTip(
+            database.get(
+                "path",
+                "",
+            )
+        )
+
+    def _set_database_button_state(
+        self,
+        connected: bool,
+        database_name: str = "",
+    ) -> None:
+        if connected:
+            self.database_button.setText(
+                f"●  DB: "
+                f"{database_name or 'Connected'}"
+            )
+
+            self.database_button.setStyleSheet(
+                """
+                QPushButton#databaseHeaderButton {
+                    min-height: 38px;
+                    padding: 0 12px;
+                    background: #FFFFFF;
+                    color: #1B7F3A;
+                    border: 1px solid #B8DEC4;
+                    border-radius: 7px;
+                    font-weight: 600;
+                }
+
+                QPushButton#databaseHeaderButton:hover {
+                    background: #F5FBF7;
+                }
+                """
+            )
+
+        else:
+            self.database_button.setText(
+                "●  DB: Not Connected"
+            )
+
+            self.database_button.setStyleSheet(
+                """
+                QPushButton#databaseHeaderButton {
+                    min-height: 38px;
+                    padding: 0 12px;
+                    background: #FFFFFF;
+                    color: #D32F2F;
+                    border: 1px solid #F1B7B7;
+                    border-radius: 7px;
+                    font-weight: 600;
+                }
+
+                QPushButton#databaseHeaderButton:hover {
+                    background: #FFF7F7;
+                }
+                """
+            )
+
+        self.database_button.update()
+
+    def _set_database_disconnected(
+        self,
+    ) -> None:
+        self._set_database_button_state(
+            False
+        )
+
+        self.database_button.setToolTip(
+            "Connect to a SQL Server database"
+        )
+
+    # ================================================================
+    # Sidebar
+    # ================================================================
+
+    def _create_sidebar(
+        self,
+    ) -> QWidget:
+        sidebar = QFrame()
+        sidebar.setObjectName("sidebar")
+        sidebar.setFixedWidth(self.SIDEBAR_WIDTH)
+
+        layout = QVBoxLayout(sidebar)
+        layout.setContentsMargins(
+            10,
+            18,
+            10,
+            14,
+        )
+        layout.setSpacing(5)
+
+        # The branding is intentionally kept in the top header.
+        # The sidebar contains navigation only.
+
+        navigation = [
+            ("home", "Home"),
+            ("network", "Network Tools"),
+            ("maintenance", "Delete Pending Order"),
+            ("activity", "Move Sales To Hist"),
+            ("activity", "Change Date"),
+            ("database", "SQL Tools"),
+            ("database", "myDATA Manager"),
+            ("backup", "Backup Manager"),
+        ]
+
+        for index, (
+            icon_name,
+            text,
+        ) in enumerate(navigation):
+            button = self._create_navigation_button(
+                icon_name,
+                text,
+                selected=index == 0,
+            )
+
+            self._navigation_buttons.append(button)
+            layout.addWidget(button)
+
+        layout.addStretch()
+
+        return sidebar
+
+    def _create_navigation_button(
+        self,
+        icon_name: str,
+        text: str,
+        selected: bool = False,
+    ) -> QPushButton:
+        button = QPushButton()
+
+        button.setObjectName(
+            "navigationItem"
+        )
+
+        button.setProperty(
+            "selected",
+            selected,
+        )
+
+        button.setProperty(
+            "navigation_text",
+            text,
+        )
+
+        button.setProperty(
+            "icon_name",
+            icon_name,
+        )
+
+        button.setFixedHeight(
+            48
+        )
+
+        button.setCursor(
+            Qt.CursorShape.PointingHandCursor
+        )
+
+        button_layout = QHBoxLayout(
+            button
+        )
+
+        button_layout.setContentsMargins(
+            10,
+            0,
+            12,
+            0,
+        )
+
+        button_layout.setSpacing(
+            14
+        )
+
+        icon_label = QLabel()
+
+        icon_label.setObjectName(
+            "navigationIcon"
+        )
+
+        icon_label.setFixedSize(
+            22,
+            22,
+        )
+
+        icon_label.setAlignment(
+            Qt.AlignmentFlag.AlignCenter
+        )
+
+        icon_label.setPixmap(
+            pixmap(
+                icon_name,
+                "#FFFFFF"
+                if selected
+                else "#26344D",
+                19,
+            )
+        )
+
+        text_label = QLabel(
+            text
+        )
+
+        button_layout.addWidget(
+            icon_label
+        )
+
+        button_layout.addWidget(
+            text_label
+        )
+
+        button_layout.addStretch()
+
+        button.clicked.connect(
+            lambda checked=False,
+            current=button:
+                self._select_navigation(
+                    current
+                )
+        )
+
+        return button
+
+    def _select_navigation(
+        self,
+        selected_button: QPushButton,
+    ) -> None:
+        navigation_text = (
+            selected_button.property(
+                "navigation_text"
+            )
+        )
+
+        for button in (
+            self._navigation_buttons
+        ):
+            is_selected = (
+                button
+                is selected_button
+            )
+
+            button.setProperty(
+                "selected",
+                is_selected,
+            )
+
+            current_icon_name = (
+                button.property(
+                    "icon_name"
+                )
+            )
+
+            button_layout = (
+                button.layout()
+            )
+
+            if (
+                button_layout is not None
+                and current_icon_name
+            ):
+                icon_item = (
+                    button_layout.itemAt(
+                        0
+                    )
+                )
+
+                icon_widget = (
+                    icon_item.widget()
+                    if icon_item
+                    else None
+                )
+
+                if isinstance(
+                    icon_widget,
+                    QLabel,
+                ):
+                    icon_widget.setPixmap(
+                        pixmap(
+                            current_icon_name,
+                            "#FFFFFF"
+                            if is_selected
+                            else "#26344D",
+                            19,
+                        )
+                    )
+
+            button.style().unpolish(
+                button
+            )
+
+            button.style().polish(
+                button
+            )
+
+            button.update()
+
+        self._navigate_from_sidebar(
+            navigation_text
+        )
+
+    # ================================================================
+    # Navigation
+    # ================================================================
+
+    def _navigate_from_sidebar(
+        self,
+        navigation_text: str,
+    ) -> None:
+        if navigation_text == "Home":
+            self._show_page(
+                "dashboard"
+            )
+
+        elif navigation_text == "Network Tools":
+            self._show_page(
+                "network_tools"
+            )
+
+        elif navigation_text == "Remote Support":
+            self._show_page(
+                "remote"
+            )
+
+        elif navigation_text == "Delete Pending Order":
+            self._show_page(
+                "pending_order"
+            )
+
+        elif navigation_text == "Move Sales To Hist":
+            self._show_page(
+                "move_sales_to_hist"
+            )
+
+        elif navigation_text == "Change Date":
+            self._show_page(
+                "change_date"
+            )
+
+        elif navigation_text == "SQL Tools":
+            self._show_page(
+                "sql_tools"
+            )
+
+        elif navigation_text == "myDATA Manager":
+            self._show_page(
+                "mydata"
+            )
+
+        elif navigation_text == "Diagnostics":
+            self._show_page(
+                "diagnostics"
+            )
+
+        elif navigation_text == "Backup Manager":
+            self._show_page(
+                "backup_manager"
+            )
+
+        elif navigation_text == "Reports":
+            self._show_page(
+                "reports"
+            )
+
+        elif navigation_text == "Settings":
+            self._show_page(
+                "settings"
+            )
+
+    # ================================================================
+    # Content
+    # ================================================================
+
+    def _create_content_area(
+        self,
+    ) -> QWidget:
+        content = QWidget()
+
+        content.setObjectName(
+            "contentArea"
+        )
+
+        layout = QVBoxLayout(
+            content
+        )
+
+        layout.setContentsMargins(
+            0,
+            0,
+            0,
+            0,
+        )
+
+        layout.setSpacing(
+            0
+        )
+
+        self.pages = QStackedWidget()
+
+        self.pages.setObjectName(
+            "pageStack"
+        )
+
+        self.dashboard_page = (
+            DashboardPage()
+        )
+
+        self.mydata_page = (
+            MyDataPage()
+        )
+
+        self.pending_order_page = (
+            PendingOrderPage()
+        )
+
+        self.change_date_page = (
+            ChangeDatePage()
+        )
+
+        self.move_sales_to_hist_page = (
+            MoveSalesToHistPage()
+        )
+
+        self.sql_tools_page = (
+            SQLToolsPage()
+        )
+
+        self.network_tools_page = (
+            NetworkToolsPage()
+        )
+
+        self.backup_manager_page = (
+            BackupManagerPage()
+        )
+
+        self.pages.addWidget(
+            self.dashboard_page
+        )
+
+        self.pages.addWidget(
+            self.mydata_page
+        )
+
+        self.pages.addWidget(
+            self.pending_order_page
+        )
+
+        self.pages.addWidget(
+            self.change_date_page
+        )
+
+        self.pages.addWidget(
+            self.move_sales_to_hist_page
+        )
+
+        self.pages.addWidget(
+            self.sql_tools_page
+        )
+
+        self.pages.addWidget(
+            self.network_tools_page
+        )
+
+        self.pages.addWidget(
+            self.backup_manager_page
+        )
+
+        layout.addWidget(
+            self.pages
+        )
+
+        return content
+
+    def _show_page(
+        self,
+        page_name: str,
+    ) -> None:
+        if page_name == "dashboard":
+            self.pages.setCurrentWidget(
+                self.dashboard_page
+            )
+
+        elif page_name == "mydata":
+            self.pages.setCurrentWidget(
+                self.mydata_page
+            )
+
+        elif page_name == "pending_order":
+            self.pages.setCurrentWidget(
+                self.pending_order_page
+            )
+
+        elif page_name == "change_date":
+            self.pages.setCurrentWidget(
+                self.change_date_page
+            )
+
+        elif page_name == "move_sales_to_hist":
+            self.pages.setCurrentWidget(
+                self.move_sales_to_hist_page
+            )
+
+        elif page_name == "sql_tools":
+            self.pages.setCurrentWidget(
+                self.sql_tools_page
+            )
+
+        elif page_name == "network_tools":
+            self.pages.setCurrentWidget(
+                self.network_tools_page
+            )
+
+        elif page_name == "backup_manager":
+            self.pages.setCurrentWidget(
+                self.backup_manager_page
+            )
+
+        else:
+            # Remote Support / Reports / Settings
+            # are retained as navigation targets.
+            # If their pages are added later, this method
+            # can route them without changing the sidebar.
+            self.pages.setCurrentWidget(
+                self.dashboard_page
+            )
+
+    # ================================================================
+    # Status Bar
+    # ================================================================
+
+    def _create_status_bar(
+        self,
+    ) -> QWidget:
+        status_bar = QFrame()
+
+        status_bar.setObjectName(
+            "statusBar"
+        )
+
+        status_bar.setFixedHeight(
+            self.STATUSBAR_HEIGHT
+        )
+
+        layout = QHBoxLayout(
+            status_bar
+        )
+
+        layout.setContentsMargins(
+            22,
+            0,
+            22,
+            0,
+        )
+
+        layout.setSpacing(
+            8
+        )
+
+        indicator = QLabel(
+            "●"
+        )
+
+        indicator.setObjectName(
+            "statusIndicator"
+        )
+
+        status_text = QLabel(
+            "Ready"
+        )
+
+        status_text.setObjectName(
+            "statusText"
+        )
+
+        layout.addWidget(
+            indicator
+        )
+
+        layout.addWidget(
+            status_text
+        )
+
+        layout.addStretch()
+
+        self._date_time_label = QLabel()
+
+        self._date_time_label.setObjectName(
+            "dateTime"
+        )
+
+        layout.addWidget(
+            self._date_time_label
+        )
+
+        return status_bar
+
+    # ================================================================
+    # Clock
+    # ================================================================
+
+    def _start_clock(
+        self,
+    ) -> None:
+        self._clock_timer = QTimer(
+            self
+        )
+
+        self._clock_timer.timeout.connect(
+            self._update_date_time
+        )
+
+        self._clock_timer.start(
+            1000
+        )
+
+        self._update_date_time()
+
+    def _update_date_time(
+        self,
+    ) -> None:
+        current = (
+            QDateTime.currentDateTime()
+        )
+
+        value = current.toString(
+            "ddd, dd MMM yyyy    HH:mm"
+        )
+
+        if hasattr(
+            self,
+            "_date_time_label",
+        ):
+            self._date_time_label.setText(
+                value
+            )
+
+
+def create_application() -> QApplication:
+    application = (
+        QApplication.instance()
+    )
+
+    if application is None:
+        application = QApplication([])
+    
+    application.setApplicationName(
+        "AIO Toolbox"
+    )
+
+    application.setApplicationDisplayName(
+        "AIO Toolbox"
+    )
+
+    application.setOrganizationName(
+        "Sunsoft"
+    )
+
+    application.setWindowIcon(
+        QIcon(
+            resource_path(
+                APP_ICON_PATH
+            )
+        )
+    )
+
+    apply_theme(
+        application
+    )
+
+    return application
