@@ -1899,12 +1899,36 @@ class DashboardPage(QWidget):
                 r"SOFTWARE\Microsoft\Windows NT\CurrentVersion",
             ) as key:
 
-                return str(
+                product_name = str(
                     winreg.QueryValueEx(
                         key,
                         "ProductName",
                     )[0]
                 )
+
+                try:
+                    build_number = int(
+                        winreg.QueryValueEx(
+                            key,
+                            "CurrentBuildNumber",
+                        )[0]
+                    )
+                except (TypeError, ValueError, OSError):
+                    build_number = 0
+
+                # Windows 11 may report "Windows 10"
+                # in ProductName for compatibility.
+                if (
+                    build_number >= 22000
+                    and product_name.startswith("Windows 10")
+                ):
+                    product_name = product_name.replace(
+                        "Windows 10",
+                        "Windows 11",
+                        1,
+                    )
+
+                return product_name
 
         except Exception:
             return ""
@@ -1929,10 +1953,7 @@ class DashboardPage(QWidget):
 
                 if name:
 
-                    return (
-                        f"{name} "
-                        f"({release})"
-                    )
+                    return name
 
                 return (
                     f"Windows "
