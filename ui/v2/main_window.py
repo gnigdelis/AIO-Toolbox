@@ -1,4 +1,4 @@
-﻿from pathlib import Path
+from pathlib import Path
 import json
 import urllib.request
 
@@ -8,8 +8,10 @@ from PySide6.QtWidgets import (
     QApplication,
     QDialog,
     QFrame,
+    QGridLayout,
     QHBoxLayout,
     QLabel,
+    QInputDialog,
     QLineEdit,
     QMainWindow,
     QMessageBox,
@@ -51,6 +53,8 @@ APP_LOGO_PATH = Path(
 
 
 IMPACT_STATUS_URL = "https://einvoiceapi.impact.gr/MyData/status"
+
+PROTECTED_PAGE_PASSWORD = "Sun$0ft"
 
 
 def resource_path(path: Path) -> str:
@@ -1003,6 +1007,468 @@ class MainWindow(QMainWindow):
     # Navigation
     # ================================================================
 
+    def _request_protected_page_password(
+        self,
+        page_title: str,
+    ) -> bool:
+        dialog = QDialog(self)
+
+        dialog.setWindowTitle(
+            "Password Required"
+        )
+
+        dialog.setModal(True)
+        dialog.setFixedSize(
+            430,
+            330,
+        )
+
+        dialog.setStyleSheet(
+            """
+            QDialog#passwordDialog {
+                background: #FFFFFF;
+                border: 1px solid #DCE5F0;
+                border-radius: 16px;
+            }
+
+            QLabel#passwordTitle {
+                color: #172B4D;
+                font-size: 23px;
+                font-weight: 700;
+            }
+
+            QLabel#passwordSubtitle {
+                color: #526176;
+                font-size: 13px;
+            }
+
+            QLabel#passwordPageName {
+                color: #1976D2;
+                font-size: 14px;
+                font-weight: 700;
+            }
+
+            QFrame#passwordIconCircle {
+                background: #EAF3FF;
+                border-radius: 38px;
+            }
+
+            QLineEdit#passwordEdit {
+                min-height: 48px;
+                padding: 0 46px 0 46px;
+                background: #F8FBFF;
+                color: #172B4D;
+                border: 1px solid #C9D8EA;
+                border-radius: 9px;
+                font-size: 14px;
+            }
+
+            QLineEdit#passwordEdit:focus {
+                background: #FFFFFF;
+                border: 2px solid #3182F6;
+            }
+
+            QLabel#passwordFieldIcon {
+                background: transparent;
+            }
+
+            QPushButton#passwordEye {
+                background: transparent;
+                border: none;
+                padding: 0;
+            }
+
+            QPushButton#passwordEye:hover {
+                background: #EAF3FF;
+                border-radius: 6px;
+            }
+
+            QPushButton#passwordCancel {
+                min-height: 44px;
+                background: #F7FAFD;
+                color: #40506A;
+                border: 1px solid #D6E0EC;
+                border-radius: 9px;
+                font-size: 13px;
+                font-weight: 600;
+            }
+
+            QPushButton#passwordCancel:hover {
+                background: #EEF3F8;
+            }
+
+            QPushButton#passwordOk {
+                min-height: 44px;
+                background: #2878F0;
+                color: #FFFFFF;
+                border: 1px solid #2878F0;
+                border-radius: 9px;
+                font-size: 13px;
+                font-weight: 700;
+            }
+
+            QPushButton#passwordOk:hover {
+                background: #1769DD;
+            }
+
+            QPushButton#passwordOk:pressed {
+                background: #125BC1;
+            }
+            """
+        )
+
+        dialog.setObjectName(
+            "passwordDialog"
+        )
+
+        main_layout = QVBoxLayout(
+            dialog
+        )
+
+        main_layout.setContentsMargins(
+            28,
+            20,
+            28,
+            24,
+        )
+
+        main_layout.setSpacing(
+            8
+        )
+
+        # ------------------------------------------------------------
+        # Lock icon
+        # ------------------------------------------------------------
+
+        icon_circle = QFrame()
+
+        icon_circle.setObjectName(
+            "passwordIconCircle"
+        )
+
+        icon_circle.setFixedSize(
+            76,
+            76,
+        )
+
+        icon_layout = QVBoxLayout(
+            icon_circle
+        )
+
+        icon_layout.setContentsMargins(
+            18,
+            18,
+            18,
+            18,
+        )
+
+        lock_icon = QLabel()
+
+        lock_icon.setAlignment(
+            Qt.AlignmentFlag.AlignCenter
+        )
+
+        lock_icon.setPixmap(
+            pixmap(
+                "lock",
+                "#1976D2",
+                40,
+            )
+        )
+
+        icon_layout.addWidget(
+            lock_icon
+        )
+
+        main_layout.addWidget(
+            icon_circle,
+            0,
+            Qt.AlignmentFlag.AlignHCenter,
+        )
+
+        # ------------------------------------------------------------
+        # Title
+        # ------------------------------------------------------------
+
+        title_label = QLabel(
+            "Password Required"
+        )
+
+        title_label.setObjectName(
+            "passwordTitle"
+        )
+
+        title_label.setAlignment(
+            Qt.AlignmentFlag.AlignCenter
+        )
+
+        main_layout.addWidget(
+            title_label
+        )
+
+        subtitle_label = QLabel(
+            "Enter the password to open"
+        )
+
+        subtitle_label.setObjectName(
+            "passwordSubtitle"
+        )
+
+        subtitle_label.setAlignment(
+            Qt.AlignmentFlag.AlignCenter
+        )
+
+        main_layout.addWidget(
+            subtitle_label
+        )
+
+        page_label = QLabel(
+            page_title
+        )
+
+        page_label.setObjectName(
+            "passwordPageName"
+        )
+
+        page_label.setAlignment(
+            Qt.AlignmentFlag.AlignCenter
+        )
+
+        main_layout.addWidget(
+            page_label
+        )
+
+        main_layout.addSpacing(
+            7
+        )
+
+        # ------------------------------------------------------------
+        # Password field
+        # ------------------------------------------------------------
+
+        password_container = QFrame()
+
+        password_grid = QGridLayout(
+            password_container
+        )
+
+        password_grid.setContentsMargins(
+            0,
+            0,
+            0,
+            0,
+        )
+
+        password_grid.setSpacing(
+            0
+        )
+
+        password_edit = QLineEdit()
+
+        password_edit.setObjectName(
+            "passwordEdit"
+        )
+
+        password_edit.setPlaceholderText(
+            "Enter password..."
+        )
+
+        password_edit.setEchoMode(
+            QLineEdit.EchoMode.Password
+        )
+
+        password_edit.setMinimumHeight(
+            48
+        )
+
+        password_edit.setFocus()
+
+        password_grid.addWidget(
+            password_edit,
+            0,
+            0,
+            1,
+            3,
+        )
+
+        field_lock = QLabel()
+
+        field_lock.setObjectName(
+            "passwordFieldIcon"
+        )
+
+        field_lock.setAlignment(
+            Qt.AlignmentFlag.AlignCenter
+        )
+
+        field_lock.setFixedSize(
+            42,
+            44,
+        )
+
+        field_lock.setPixmap(
+            pixmap(
+                "lock",
+                "#60738C",
+                19,
+            )
+        )
+
+        password_grid.addWidget(
+            field_lock,
+            0,
+            0,
+            Qt.AlignmentFlag.AlignLeft
+            | Qt.AlignmentFlag.AlignVCenter,
+        )
+
+        eye_button = QPushButton()
+
+        eye_button.setObjectName(
+            "passwordEye"
+        )
+
+        eye_button.setCursor(
+            Qt.CursorShape.PointingHandCursor
+        )
+
+        eye_button.setFixedSize(
+            42,
+            42,
+        )
+
+        eye_button.setIcon(
+            icon(
+                "eye",
+                "#60738C",
+                20,
+            )
+        )
+
+        eye_button.setIconSize(
+            QSize(
+                20,
+                20,
+            )
+        )
+
+        password_grid.addWidget(
+            eye_button,
+            0,
+            2,
+            Qt.AlignmentFlag.AlignRight
+            | Qt.AlignmentFlag.AlignVCenter,
+        )
+
+        def toggle_password() -> None:
+            if (
+                password_edit.echoMode()
+                == QLineEdit.EchoMode.Password
+            ):
+                password_edit.setEchoMode(
+                    QLineEdit.EchoMode.Normal
+                )
+            else:
+                password_edit.setEchoMode(
+                    QLineEdit.EchoMode.Password
+                )
+
+        eye_button.clicked.connect(
+            toggle_password
+        )
+
+        main_layout.addWidget(
+            password_container
+        )
+
+        main_layout.addSpacing(
+            8
+        )
+
+        # ------------------------------------------------------------
+        # Buttons
+        # ------------------------------------------------------------
+
+        buttons_layout = QHBoxLayout()
+
+        buttons_layout.setSpacing(
+            12
+        )
+
+        cancel_button = QPushButton(
+            "Cancel"
+        )
+
+        cancel_button.setObjectName(
+            "passwordCancel"
+        )
+
+        cancel_button.setCursor(
+            Qt.CursorShape.PointingHandCursor
+        )
+
+        cancel_button.clicked.connect(
+            dialog.reject
+        )
+
+        ok_button = QPushButton(
+            "OK"
+        )
+
+        ok_button.setObjectName(
+            "passwordOk"
+        )
+
+        ok_button.setCursor(
+            Qt.CursorShape.PointingHandCursor
+        )
+
+        ok_button.clicked.connect(
+            dialog.accept
+        )
+
+        buttons_layout.addWidget(
+            cancel_button,
+            1,
+        )
+
+        buttons_layout.addWidget(
+            ok_button,
+            1,
+        )
+
+        main_layout.addLayout(
+            buttons_layout
+        )
+
+        password_edit.returnPressed.connect(
+            dialog.accept
+        )
+
+        dialog.move(
+            self.geometry().center()
+            - dialog.rect().center()
+        )
+
+        if (
+            dialog.exec()
+            != QDialog.DialogCode.Accepted
+        ):
+            return False
+
+        password = password_edit.text()
+
+        if password == PROTECTED_PAGE_PASSWORD:
+            return True
+
+        QMessageBox.warning(
+            self,
+            "Access Denied",
+            "Incorrect password.",
+        )
+
+        return False
+
     def _navigate_from_sidebar(
         self,
         navigation_text: str,
@@ -1028,9 +1494,12 @@ class MainWindow(QMainWindow):
             )
 
         elif navigation_text == "Move Sales To Hist":
-            self._show_page(
-                "move_sales_to_hist"
-            )
+            if self._request_protected_page_password(
+                "Move Sales To Hist"
+            ):
+                self._show_page(
+                    "move_sales_to_hist"
+                )
 
         elif navigation_text == "Change Date":
             self._show_page(
@@ -1038,9 +1507,12 @@ class MainWindow(QMainWindow):
             )
 
         elif navigation_text == "SQL Tools":
-            self._show_page(
-                "sql_tools"
-            )
+            if self._request_protected_page_password(
+                "SQL Tools"
+            ):
+                self._show_page(
+                    "sql_tools"
+                )
 
         elif navigation_text == "myDATA Manager":
             self._show_page(
