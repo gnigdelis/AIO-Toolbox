@@ -14,3 +14,6 @@ dist/
 
 .DS_Store
 Thumbs.db
+# Local backup files
+*.bak
+*.backup_before_win11_fix

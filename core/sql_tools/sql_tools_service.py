@@ -1,4 +1,4 @@
-from __future__ import annotations
+﻿from __future__ import annotations
 
 from dataclasses import dataclass
 
@@ -229,9 +229,9 @@ class SQLToolsService:
 
         if not self.supports_failed_mydata_payments():
             raise RuntimeError(
-                "Η λειτουργία Delete Failed MyDATA Payments "
-                "δεν υποστηρίζεται από αυτή την έκδοση "
-                "της βάσης δεδομένων."
+                "Ξ— Ξ»ΞµΞΉΟ„ΞΏΟ…ΟΞ³Ξ―Ξ± Delete Failed MyDATA Payments "
+                "Ξ΄ΞµΞ½ Ο…Ο€ΞΏΟƒΟ„Ξ·ΟΞ―Ξ¶ΞµΟ„Ξ±ΞΉ Ξ±Ο€Ο Ξ±Ο…Ο„Ξ® Ο„Ξ·Ξ½ Ξ­ΞΊΞ΄ΞΏΟƒΞ· "
+                "Ο„Ξ·Ο‚ Ξ²Ξ¬ΟƒΞ·Ο‚ Ξ΄ΞµΞ΄ΞΏΞΌΞ­Ξ½Ο‰Ξ½."
             )
 
         connection = None
@@ -253,8 +253,8 @@ class SQLToolsService:
             return SQLToolResult(
                 success=True,
                 message=(
-                    "Η διαγραφή των Failed MyDATA Payments "
-                    "ολοκληρώθηκε επιτυχώς."
+                    "Ξ— Ξ΄ΞΉΞ±Ξ³ΟΞ±Ο†Ξ® Ο„Ο‰Ξ½ Failed MyDATA Payments "
+                    "ΞΏΞ»ΞΏΞΊΞ»Ξ·ΟΟΞΈΞ·ΞΊΞµ ΞµΟ€ΞΉΟ„Ο…Ο‡ΟΟ‚."
                 ),
             )
 
@@ -267,7 +267,7 @@ class SQLToolsService:
                     pass
 
             raise RuntimeError(
-                "Η διαγραφή των Failed MyDATA Payments απέτυχε.\n\n"
+                "Ξ— Ξ΄ΞΉΞ±Ξ³ΟΞ±Ο†Ξ® Ο„Ο‰Ξ½ Failed MyDATA Payments Ξ±Ο€Ξ­Ο„Ο…Ο‡Ξµ.\n\n"
                 f"{exc}"
             ) from exc
 
@@ -355,7 +355,7 @@ class SQLToolsService:
 
         if not udl_path:
             raise RuntimeError(
-                "Δεν έχει επιλεγεί ενεργή βάση δεδομένων."
+                "Ξ”ΞµΞ½ Ξ­Ο‡ΞµΞΉ ΞµΟ€ΞΉΞ»ΞµΞ³ΞµΞ― ΞµΞ½ΞµΟΞ³Ξ® Ξ²Ξ¬ΟƒΞ· Ξ΄ΞµΞ΄ΞΏΞΌΞ­Ξ½Ο‰Ξ½."
             )
 
         return udl_path
@@ -397,8 +397,8 @@ class SQLToolsService:
             return SQLToolResult(
                 success=True,
                 message=(
-                    "Η διαγραφή των MyDATA responses "
-                    "ολοκληρώθηκε επιτυχώς."
+                    "Ξ— Ξ΄ΞΉΞ±Ξ³ΟΞ±Ο†Ξ® Ο„Ο‰Ξ½ MyDATA responses "
+                    "ΞΏΞ»ΞΏΞΊΞ»Ξ·ΟΟΞΈΞ·ΞΊΞµ ΞµΟ€ΞΉΟ„Ο…Ο‡ΟΟ‚."
                 ),
                 affected_rows=(
                     affected_rows
@@ -417,7 +417,7 @@ class SQLToolsService:
                     pass
 
             raise RuntimeError(
-                "Η διαγραφή των MyDATA responses απέτυχε.\n\n"
+                "Ξ— Ξ΄ΞΉΞ±Ξ³ΟΞ±Ο†Ξ® Ο„Ο‰Ξ½ MyDATA responses Ξ±Ο€Ξ­Ο„Ο…Ο‡Ξµ.\n\n"
                 f"{exc}"
             ) from exc
 
@@ -439,6 +439,88 @@ class SQLToolsService:
     # REBUILD DATABASE
     # ==============================================================
 
+    def delete_mydata_responses_before(
+        self,
+        date_value: str,
+    ) -> SQLToolResult:
+        """
+        Delete MyDATA response records from the selected date
+        and all previous dates, inclusive.
+        """
+
+        from datetime import datetime, timedelta
+
+        try:
+            selected_date = datetime.strptime(
+                date_value,
+                "%Y%m%d",
+            ).date()
+
+        except ValueError as exc:
+            raise RuntimeError(
+                "Invalid date. Expected format YYYYMMDD."
+            ) from exc
+
+        delete_before = selected_date + timedelta(days=1)
+
+        connection = None
+        cursor = None
+
+        try:
+            connection = self._connect()
+            cursor = connection.cursor()
+
+            cursor.execute(
+                """
+                DELETE FROM TblSnMyDATA_Response
+                WHERE MyDATA_ResponseDate < ?
+                """,
+                delete_before,
+            )
+
+            affected_rows = cursor.rowcount
+
+            connection.commit()
+
+            return SQLToolResult(
+                success=True,
+                message=(
+                    "MyDATA responses were deleted successfully."
+                ),
+                affected_rows=(
+                    affected_rows
+                    if affected_rows is not None
+                    and affected_rows >= 0
+                    else 0
+                ),
+            )
+
+        except Exception as exc:
+
+            if connection is not None:
+                try:
+                    connection.rollback()
+                except Exception:
+                    pass
+
+            raise RuntimeError(
+                "Failed to delete MyDATA responses before date.\n\n"
+                f"{exc}"
+            ) from exc
+
+        finally:
+
+            if cursor is not None:
+                try:
+                    cursor.close()
+                except Exception:
+                    pass
+
+            if connection is not None:
+                try:
+                    connection.close()
+                except Exception:
+                    pass
     def rebuild_database(self) -> SQLToolResult:
         """
         Execute the real SPSnRebuildUpdate stored procedure.
@@ -463,8 +545,8 @@ class SQLToolsService:
             return SQLToolResult(
                 success=True,
                 message=(
-                    "Το Rebuild της βάσης "
-                    "ολοκληρώθηκε επιτυχώς."
+                    "Ξ¤ΞΏ Rebuild Ο„Ξ·Ο‚ Ξ²Ξ¬ΟƒΞ·Ο‚ "
+                    "ΞΏΞ»ΞΏΞΊΞ»Ξ·ΟΟΞΈΞ·ΞΊΞµ ΞµΟ€ΞΉΟ„Ο…Ο‡ΟΟ‚."
                 ),
             )
 
@@ -477,7 +559,7 @@ class SQLToolsService:
                     pass
 
             raise RuntimeError(
-                "Το Rebuild της βάσης απέτυχε.\n\n"
+                "Ξ¤ΞΏ Rebuild Ο„Ξ·Ο‚ Ξ²Ξ¬ΟƒΞ·Ο‚ Ξ±Ο€Ξ­Ο„Ο…Ο‡Ξµ.\n\n"
                 f"{exc}"
             ) from exc
 
@@ -526,15 +608,15 @@ class SQLToolsService:
             return SQLToolResult(
                 success=True,
                 message=(
-                    "Το Shrink Database "
-                    "ολοκληρώθηκε επιτυχώς."
+                    "Ξ¤ΞΏ Shrink Database "
+                    "ΞΏΞ»ΞΏΞΊΞ»Ξ·ΟΟΞΈΞ·ΞΊΞµ ΞµΟ€ΞΉΟ„Ο…Ο‡ΟΟ‚."
                 ),
             )
 
         except Exception as exc:
 
             raise RuntimeError(
-                "Το Shrink Database απέτυχε.\n\n"
+                "Ξ¤ΞΏ Shrink Database Ξ±Ο€Ξ­Ο„Ο…Ο‡Ξµ.\n\n"
                 f"{exc}"
             ) from exc
 

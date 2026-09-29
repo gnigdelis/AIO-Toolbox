@@ -1,7 +1,8 @@
 from __future__ import annotations
 
-from PySide6.QtCore import QObject, Qt, QThread, Signal
+from PySide6.QtCore import QDate, QObject, Qt, QThread, Signal
 from PySide6.QtWidgets import (
+    QDateEdit,
     QFrame,
     QHBoxLayout,
     QLabel,
@@ -26,10 +27,16 @@ class SQLToolWorker(QObject):
     finished = Signal(object, str)
     failed = Signal(str, str)
 
-    def __init__(self, operation: str, operation_name: str) -> None:
+    def __init__(
+        self,
+        operation: str,
+        operation_name: str,
+        operation_arg: object | None = None,
+    ) -> None:
         super().__init__()
         self.operation = operation
         self.operation_name = operation_name
+        self.operation_arg = operation_arg
 
     def run(self) -> None:
         try:
@@ -40,6 +47,11 @@ class SQLToolWorker(QObject):
 
             elif self.operation == "delete_failed_mydata_payments":
                 result = service.delete_failed_mydata_payments()
+
+            elif self.operation == "delete_mydata_before":
+                result = service.delete_mydata_responses_before(
+                    str(self.operation_arg)
+                )
 
             elif self.operation == "rebuild":
                 result = service.rebuild_database()
@@ -203,6 +215,104 @@ class SQLToolsPage(QFrame):
             )
 
         content_layout.addWidget(self.failed_mydata_card)
+
+        self.delete_before_date_card = self._create_card()
+
+        delete_before_layout = QVBoxLayout(
+            self.delete_before_date_card
+        )
+        delete_before_layout.setContentsMargins(
+            14, 18, 14, 14
+        )
+        delete_before_layout.setSpacing(10)
+
+        delete_before_top_layout = QHBoxLayout()
+        delete_before_top_layout.setSpacing(12)
+
+        delete_before_text_layout = QVBoxLayout()
+        delete_before_text_layout.setSpacing(5)
+
+        delete_before_title = QLabel(
+            "Delete MyDATA Responses Before Date"
+        )
+        delete_before_title.setObjectName("toolTitle")
+
+        delete_before_description = QLabel(
+            "Delete all MyDATA response records from the "
+            "selected date and before, including the selected date."
+        )
+        delete_before_description.setObjectName(
+            "toolDescription"
+        )
+        delete_before_description.setWordWrap(True)
+
+        delete_before_text_layout.addWidget(
+            delete_before_title
+        )
+        delete_before_text_layout.addWidget(
+            delete_before_description
+        )
+
+        delete_before_top_layout.addLayout(
+            delete_before_text_layout,
+            1,
+        )
+
+        delete_before_controls = QHBoxLayout()
+        delete_before_controls.setSpacing(8)
+
+        self.delete_before_date_edit = QDateEdit()
+        self.delete_before_date_edit.setObjectName(
+            "toolDateEdit"
+        )
+        self.delete_before_date_edit.setDisplayFormat(
+            "dd/MM/yyyy"
+        )
+        self.delete_before_date_edit.setCalendarPopup(True)
+        self.delete_before_date_edit.setDate(
+            QDate.currentDate()
+        )
+        self.delete_before_date_edit.setMinimumWidth(125)
+        self.delete_before_date_edit.setMinimumHeight(36)
+
+        self.delete_before_date_button = QPushButton(
+            "DELETE RESPONSES"
+        )
+        self.delete_before_date_button.setObjectName(
+            "toolButton"
+        )
+        self.delete_before_date_button.setProperty(
+            "buttonKind",
+            "danger",
+        )
+        self.delete_before_date_button.setMinimumWidth(165)
+        self.delete_before_date_button.setMinimumHeight(36)
+        self.delete_before_date_button.setCursor(
+            Qt.CursorShape.PointingHandCursor
+        )
+
+        self.delete_before_date_button.clicked.connect(
+            self._delete_mydata_responses_before_date
+        )
+
+        delete_before_controls.addWidget(
+            self.delete_before_date_edit
+        )
+        delete_before_controls.addWidget(
+            self.delete_before_date_button
+        )
+
+        delete_before_top_layout.addLayout(
+            delete_before_controls
+        )
+
+        delete_before_layout.addLayout(
+            delete_before_top_layout
+        )
+
+        content_layout.addWidget(
+            self.delete_before_date_card
+        )
 
         self.rebuild_card = self._create_tool_card(
             title="Rebuild Database",
@@ -573,10 +683,59 @@ class SQLToolsPage(QFrame):
     # Worker
     # ------------------------------------------------------------------
 
+    def _delete_mydata_responses_before_date(self) -> None:
+        if not database_context.is_selected():
+            QMessageBox.warning(
+                self,
+                "Database Required",
+                "No database is selected.",
+            )
+            return
+
+        selected_date = self.delete_before_date_edit.date()
+
+        display_date = selected_date.toString(
+            "dd/MM/yyyy"
+        )
+
+        date_value = selected_date.toString(
+            "yyyyMMdd"
+        )
+
+        database = database_context.active() or {}
+        database_name = database.get("name", "-")
+
+        answer = QMessageBox.warning(
+            self,
+            "Delete MyDATA Responses Before Date",
+            (
+                "All records from TblSnMyDATA_Response "
+                "from the selected date and before will be deleted.\n\n"
+                f"Date: {display_date}\n"
+                f"Database: {database_name}\n\n"
+                "The selected date is included.\n"
+                "This action cannot be undone.\n\n"
+                "Do you want to continue?"
+            ),
+            QMessageBox.StandardButton.Yes
+            | QMessageBox.StandardButton.No,
+            QMessageBox.StandardButton.No,
+        )
+
+        if answer != QMessageBox.StandardButton.Yes:
+            return
+
+        self._start_operation(
+            "delete_mydata_before",
+            "Delete MyDATA Responses Before Date",
+            date_value,
+        )
+
     def _start_operation(
         self,
         operation: str,
         operation_name: str,
+        operation_arg: object | None = None,
     ) -> None:
         if self._thread is not None:
             return
@@ -592,6 +751,7 @@ class SQLToolsPage(QFrame):
         self._worker = SQLToolWorker(
             operation,
             operation_name,
+            operation_arg,
         )
 
         self._worker.moveToThread(self._thread)
@@ -642,7 +802,10 @@ class SQLToolsPage(QFrame):
         self._set_controls_enabled(True)
 
         if result.success:
-            if operation_name == "Delete MyDATA Responses":
+            if operation_name in (
+                "Delete MyDATA Responses",
+                "Delete MyDATA Responses Before Date",
+            ):
                 if result.affected_rows >= 0:
                     message = (
                         f"{operation_name} ολοκληρώθηκε επιτυχώς.\n"
@@ -725,6 +888,16 @@ class SQLToolsPage(QFrame):
                 and self._failed_mydata_payments_supported
             )
 
+        if hasattr(self, "delete_before_date_edit") and self.delete_before_date_edit:
+            self.delete_before_date_edit.setEnabled(
+                enabled and database_selected
+            )
+
+        if hasattr(self, "delete_before_date_button") and self.delete_before_date_button:
+            self.delete_before_date_button.setEnabled(
+                enabled and database_selected
+            )
+
         if hasattr(self, "rebuild_button") and self.rebuild_button:
             self.rebuild_button.setEnabled(
                 enabled and database_selected
@@ -763,6 +936,16 @@ class SQLToolsPage(QFrame):
                 self.failed_mydata_button.setText(
                     "NOT AVAILABLE"
                 )
+
+        if hasattr(self, "delete_before_date_edit") and self.delete_before_date_edit:
+            self.delete_before_date_edit.setEnabled(
+                database_context.is_selected()
+            )
+
+        if hasattr(self, "delete_before_date_button") and self.delete_before_date_button:
+            self.delete_before_date_button.setEnabled(
+                database_context.is_selected()
+            )
 
     def _clear_log(self) -> None:
         if database_context.is_selected():

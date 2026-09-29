@@ -49,9 +49,9 @@ class MyDataService:
         INNER JOIN TblSnSalesTrans s
             ON s.SalesTransOID = p.SalesTransOID
         WHERE
-            CONVERT(date, s.SalesTransRealDate)
-                BETWEEN CONVERT(date, ?, 112)
-                AND CONVERT(date, ?, 112)
+            s.SalesTransRealDate >= CONVERT(date, ?, 112)
+            AND s.SalesTransRealDate <
+                DATEADD(day, 1, CONVERT(date, ?, 112))
             AND EXISTS
             (
                 SELECT 1
@@ -76,14 +76,7 @@ class MyDataService:
             h.SalesTransOID,
 
             CASE
-                WHEN EXISTS
-                (
-                    SELECT 1
-                    FROM TblSnMyDATA_Response rs
-                    WHERE
-                        rs.MyDATA_ResponseSalesTransPosHdr = h.InvoiceId
-                        AND rs.MyDATA_ResponseStatusCode = 'Success'
-                )
+                WHEN SuccessResponse.HasSuccess = 1
                     THEN 'SENT'
                 ELSE 'PENDING'
             END AS MyDataState,
@@ -97,6 +90,7 @@ class MyDataService:
         OUTER APPLY
         (
             SELECT TOP 1
+                1 AS HasSuccess,
                 r.MyDATA_ResponseInvoiceMARK,
                 r.MyDATA_ResponseProviderQRCodeLink,
                 r.MyDATA_ResponseTransactorTRN
@@ -119,9 +113,9 @@ class MyDataService:
             CustAFM
         FROM VSnMyDATAInvoicesAMV
         WHERE
-            CONVERT(date, issueDate)
-                BETWEEN CONVERT(date, ?, 112)
-                AND CONVERT(date, ?, 112)
+            issueDate >= CONVERT(date, ?, 112)
+            AND issueDate <
+                DATEADD(day, 1, CONVERT(date, ?, 112))
     ),
 
     CurrentWithResponse AS
@@ -135,14 +129,7 @@ class MyDataService:
             c.CustAFM,
 
             CASE
-                WHEN EXISTS
-                (
-                    SELECT 1
-                    FROM TblSnMyDATA_Response rs
-                    WHERE
-                        rs.MyDATA_ResponseSalesTransPosHdr = c.InvoiceId
-                        AND rs.MyDATA_ResponseStatusCode = 'Success'
-                )
+                WHEN SuccessResponse.HasSuccess = 1
                     THEN 'SENT'
                 ELSE 'PENDING'
             END AS MyDataState,
@@ -162,6 +149,7 @@ class MyDataService:
         OUTER APPLY
         (
             SELECT TOP 1
+                1 AS HasSuccess,
                 r.MyDATA_ResponseInvoiceMARK,
                 r.MyDATA_ResponseProviderQRCodeLink
             FROM TblSnMyDATA_Response r
@@ -217,7 +205,7 @@ class MyDataService:
     WHERE NOT EXISTS
     (
         SELECT 1
-        FROM HistoricalWithResponse h
+        FROM HistoricalInvoices h
         WHERE h.InvoiceId = c.InvoiceId
     )
 
