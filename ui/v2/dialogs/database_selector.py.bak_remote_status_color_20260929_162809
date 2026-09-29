@@ -670,16 +670,11 @@ class DatabaseSelector(QDialog):
         )
 
 
-    def _load_remote_udl(self, udl_path: str | Path) -> None:
+    def _load_remote_udl(self, udl_path: str) -> None:
         try:
-            connection = DatabaseConnection(
-                str(udl_path)
-            )
+            connection = DatabaseConnection(udl_path)
 
-            self.remote_udl_path = str(
-                udl_path
-            )
-
+            self.remote_udl_path = udl_path
             self.remote_connection = connection
 
             self.remote_udl_edit.setText(
@@ -713,28 +708,10 @@ class DatabaseSelector(QDialog):
             except Exception:
                 pass
 
-            self.remote_username_value.setText(
-                username
-            )
+            self.remote_username_value.setText(username)
 
-            self.database_name = (
-                connection.database_name()
-            )
-
-            self.server_name = (
-                connection.server_name()
-            )
-
-            self.remote_status.setStyleSheet(
-                """
-                QLabel {
-                    background-color: #f4f6f8;
-                    color: #667085;
-                    border-radius: 6px;
-                    padding: 8px;
-                }
-                """
-            )
+            self.database_name = connection.database_name()
+            self.server_name = connection.server_name()
 
             self.remote_status.setText(
                 "Status: UDL loaded. Ready to test."
@@ -759,19 +736,6 @@ class DatabaseSelector(QDialog):
 
             self.remote_test_button.setEnabled(False)
             self.connect_button.setEnabled(False)
-
-            self.remote_status.setStyleSheet(
-                """
-                QLabel {
-                    background-color: #fdecec;
-                    color: #c62828;
-                    border: 1px solid #f5b5b5;
-                    border-radius: 6px;
-                    padding: 8px;
-                    font-weight: 600;
-                }
-                """
-            )
 
             self.remote_status.setText(
                 "Status: Invalid UDL"
@@ -1320,7 +1284,6 @@ class DatabaseSelector(QDialog):
         )
 
         if not udl_path:
-            self.remote_status.setStyleSheet("")
             self.remote_status.setText(
                 "Status: Select a UDL file first."
             )
@@ -1328,17 +1291,6 @@ class DatabaseSelector(QDialog):
             self.connect_button.setEnabled(False)
 
             return False
-
-        self.remote_status.setStyleSheet(
-            """
-            QLabel {
-                background-color: #f4f6f8;
-                color: #667085;
-                border-radius: 6px;
-                padding: 8px;
-            }
-            """
-        )
 
         self.remote_status.setText(
             "Status: Testing connection..."
@@ -1348,6 +1300,8 @@ class DatabaseSelector(QDialog):
         self.connect_button.setEnabled(False)
 
         try:
+            # Use the already loaded DatabaseConnection object.
+            # Do not create another one here.
             connection = getattr(
                 self,
                 "remote_connection",
@@ -1364,6 +1318,7 @@ class DatabaseSelector(QDialog):
                 cursor.execute("SELECT 1")
                 cursor.fetchone()
 
+            # Keep the DatabaseConnection object for Connect.
             self.remote_connection = connection
 
             server = (
@@ -1380,25 +1335,21 @@ class DatabaseSelector(QDialog):
                 "Status: Connection successful"
             )
 
-            self.remote_status.setStyleSheet(
-                """
-                QLabel {
-                    background-color: #e8f7ee;
-                    color: #198754;
-                    border: 1px solid #b7e4c7;
-                    border-radius: 6px;
-                    padding: 8px;
-                    font-weight: 600;
-                }
-                """
-            )
-
-            self.remote_test_button.setEnabled(True)
             self.connect_button.setEnabled(True)
 
             self._set_status(
                 "Remote / Client connection successful.",
                 "success",
+            )
+
+            QMessageBox.information(
+                self,
+                "Connection Successful",
+                (
+                    "The database connection was successful."
+                    f"\n\nServer: {server}"
+                    f"\nDatabase: {database}"
+                ),
             )
 
             return True
@@ -1408,20 +1359,6 @@ class DatabaseSelector(QDialog):
                 "Status: Connection failed"
             )
 
-            self.remote_status.setStyleSheet(
-                """
-                QLabel {
-                    background-color: #fdecec;
-                    color: #c62828;
-                    border: 1px solid #f5b5b5;
-                    border-radius: 6px;
-                    padding: 8px;
-                    font-weight: 600;
-                }
-                """
-            )
-
-            self.remote_test_button.setEnabled(True)
             self.connect_button.setEnabled(False)
 
             self._set_status(

@@ -34,6 +34,9 @@ from ui.v2.pages.move_sales_to_hist.move_sales_to_hist_page import (
     MoveSalesToHistPage,
 )
 from ui.v2.pages.sql_tools.sql_tools_page import SQLToolsPage
+from ui.v2.pages.network_tools.network_tools_page import (
+    NetworkToolsPage,
+)
 from ui.v2.pages.backup.backup_manager_page import BackupManagerPage
 
 from ui.v2.theme.svg_icons import icon, pixmap
@@ -576,38 +579,171 @@ class MainWindow(QMainWindow):
         else:
             self._set_database_disconnected()
 
-    def _open_database_selector(self) -> None:
-        dialog = DatabaseSelector(self)
+    def _open_database_selector(
+        self,
+    ) -> None:
+        dialog = DatabaseSelector(
+            self
+        )
 
-        if dialog.exec() != QDialog.DialogCode.Accepted:
-            return
+        # Same AIO Toolbox application icon.
+        dialog.setWindowIcon(
+            self.windowIcon()
+        )
 
-        selected_udl = dialog.selected_udl
-
-        if not selected_udl:
-            QMessageBox.warning(
-                self,
-                "Database",
-                "No database connection was selected.",
-            )
+        if (
+            dialog.exec()
+            != QDialog.DialogCode.Accepted
+        ):
             return
 
         try:
-            database = database_context.select(
-                selected_udl
+            # ----------------------------------------------------
+            # Remote / Client connection
+            # ----------------------------------------------------
+
+            if (
+                dialog.connection_type
+                == "remote"
+            ):
+                remote = (
+                    dialog.remote_connection
+                )
+
+                if not remote:
+                    return
+
+                database = (
+                    database_context.select_remote(
+                        server=remote["server"],
+                        database=remote["database"],
+                        username=remote["username"],
+                        password=remote["password"],
+                        driver=remote.get(
+                            "driver",
+                            "ODBC Driver 17 for SQL Server",
+                        ),
+                        encrypt=remote.get(
+                            "encrypt",
+                            False,
+                        ),
+                        trust_server_certificate=remote.get(
+                            "trust_server_certificate",
+                            True,
+                        ),
+                        store_name=remote.get(
+                            "store_name",
+                            "",
+                        ),
+                    )
+                )
+
+                self._database_changed(
+                    database
+                )
+
+                message_box = QMessageBox(
+                    self
+                )
+
+                message_box.setIcon(
+                    QMessageBox.Icon.Information
+                )
+
+                message_box.setWindowTitle(
+                    "Database Connected"
+                )
+
+                message_box.setText(
+                    "Remote database connection "
+                    "established successfully."
+                )
+
+                message_box.setInformativeText(
+                    f"Server:\n"
+                    f"{remote['server']}\n\n"
+                    f"Database:\n"
+                    f"{remote['database']}"
+                )
+
+                message_box.exec()
+
+                return
+
+            # ----------------------------------------------------
+            # Local / UDL connection
+            # ----------------------------------------------------
+
+            selected_udl = (
+                dialog.selected_udl
+            )
+
+            if not selected_udl:
+                return
+
+            database = (
+                database_context.select(
+                    selected_udl
+                )
             )
 
             self._database_changed(
                 database
             )
 
-        except Exception as exc:
-            QMessageBox.critical(
-                self,
-                "Database Connection",
-                f"Could not activate the selected database.\n\nError:\n{exc}",
+            message_box = QMessageBox(
+                self
             )
 
+            message_box.setIcon(
+                QMessageBox.Icon.Information
+            )
+
+            message_box.setWindowTitle(
+                "Database Connected"
+            )
+
+            message_box.setText(
+                "Database connection "
+                "established successfully."
+            )
+
+            message_box.setInformativeText(
+                f"Server:\n"
+                f"{database.get('server', '-')}"
+                f"\n\n"
+                f"Database:\n"
+                f"{database.get('name', '-')}"
+                f"\n\n"
+                f"UDL:\n"
+                f"{selected_udl}"
+            )
+
+            message_box.exec()
+
+        except Exception as exc:
+            message_box = QMessageBox(
+                self
+            )
+
+            message_box.setIcon(
+                QMessageBox.Icon.Critical
+            )
+
+            message_box.setWindowTitle(
+                "Database Connection Error"
+            )
+
+            message_box.setText(
+                "The database connection could "
+                "not be loaded."
+            )
+
+            message_box.setInformativeText(
+                f"Error:\n{exc}"
+            )
+
+            message_box.exec()
     def _database_changed(
         self,
         database: dict | None,
@@ -839,6 +975,7 @@ class MainWindow(QMainWindow):
 
         navigation = [
             ("home", "Home"),
+            ("network", "Network Tools"),
             ("maintenance", "Delete Pending Order"),
             ("activity", "Move Sales To Hist"),
             ("activity", "Change Date"),
@@ -1515,6 +1652,10 @@ class MainWindow(QMainWindow):
                 "dashboard"
             )
 
+        elif navigation_text == "Network Tools":
+            self._show_page(
+                "network_tools"
+            )
 
         elif navigation_text == "Remote Support":
             self._show_page(
@@ -1630,6 +1771,9 @@ class MainWindow(QMainWindow):
             SQLToolsPage()
         )
 
+        self.network_tools_page = (
+            NetworkToolsPage()
+        )
 
         self.backup_manager_page = (
             BackupManagerPage()
@@ -1659,6 +1803,9 @@ class MainWindow(QMainWindow):
             self.sql_tools_page
         )
 
+        self.pages.addWidget(
+            self.network_tools_page
+        )
 
         self.pages.addWidget(
             self.backup_manager_page
@@ -1704,6 +1851,10 @@ class MainWindow(QMainWindow):
                 self.sql_tools_page
             )
 
+        elif page_name == "network_tools":
+            self.pages.setCurrentWidget(
+                self.network_tools_page
+            )
 
         elif page_name == "backup_manager":
             self.pages.setCurrentWidget(

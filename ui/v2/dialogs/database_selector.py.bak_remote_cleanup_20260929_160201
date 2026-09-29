@@ -645,46 +645,29 @@ class DatabaseSelector(QDialog):
         self.remote_card.hide()
 
     def _browse_remote_udl(self) -> None:
-        start_folder = self._get_last_folder()
+        start_folder = str(Path.home())
 
-        file_path, _ = QFileDialog.getOpenFileName(
+        path, _ = QFileDialog.getOpenFileName(
             self,
             "Select Remote / Client UDL",
-            str(start_folder),
+            start_folder,
             "UDL files (*.udl);;All files (*.*)",
         )
 
-        if not file_path:
+        if not path:
             return
 
-        selected_path = Path(
-            file_path
-        ).resolve()
+        self._save_last_folder(Path(path).parent)
+        self._load_remote_udl(path)
 
-        self._save_last_folder(
-            selected_path.parent
-        )
-
-        self._load_remote_udl(
-            selected_path
-        )
-
-
-    def _load_remote_udl(self, udl_path: str | Path) -> None:
+    def _load_remote_udl(self, udl_path: str) -> None:
         try:
-            connection = DatabaseConnection(
-                str(udl_path)
-            )
+            connection = DatabaseConnection(udl_path)
 
-            self.remote_udl_path = str(
-                udl_path
-            )
-
+            self.remote_udl_path = udl_path
             self.remote_connection = connection
 
-            self.remote_udl_edit.setText(
-                str(udl_path)
-            )
+            self.remote_udl_edit.setText(udl_path)
 
             self.remote_server_value.setText(
                 connection.server_name() or "-"
@@ -697,9 +680,7 @@ class DatabaseSelector(QDialog):
             username = "-"
 
             try:
-                connection_string = (
-                    connection.reader.get_connection_string()
-                )
+                connection_string = connection.reader.get_connection_string()
 
                 match = re.search(
                     r"(?:User ID|UID)\s*=\s*([^;]+)",
@@ -709,39 +690,19 @@ class DatabaseSelector(QDialog):
 
                 if match:
                     username = match.group(1).strip()
-
             except Exception:
                 pass
 
-            self.remote_username_value.setText(
-                username
-            )
+            self.remote_username_value.setText(username)
 
-            self.database_name = (
-                connection.database_name()
-            )
-
-            self.server_name = (
-                connection.server_name()
-            )
-
-            self.remote_status.setStyleSheet(
-                """
-                QLabel {
-                    background-color: #f4f6f8;
-                    color: #667085;
-                    border-radius: 6px;
-                    padding: 8px;
-                }
-                """
-            )
+            self.database_name = connection.database_name()
+            self.server_name = connection.server_name()
 
             self.remote_status.setText(
                 "Status: UDL loaded. Ready to test."
             )
 
             self.remote_test_button.setEnabled(True)
-            self.connect_button.setEnabled(True)
 
             self._set_status(
                 "Remote / Client UDL selected.",
@@ -756,22 +717,7 @@ class DatabaseSelector(QDialog):
             self.remote_server_value.setText("-")
             self.remote_database_value.setText("-")
             self.remote_username_value.setText("-")
-
             self.remote_test_button.setEnabled(False)
-            self.connect_button.setEnabled(False)
-
-            self.remote_status.setStyleSheet(
-                """
-                QLabel {
-                    background-color: #fdecec;
-                    color: #c62828;
-                    border: 1px solid #f5b5b5;
-                    border-radius: 6px;
-                    padding: 8px;
-                    font-weight: 600;
-                }
-                """
-            )
 
             self.remote_status.setText(
                 "Status: Invalid UDL"
@@ -780,10 +726,95 @@ class DatabaseSelector(QDialog):
             QMessageBox.critical(
                 self,
                 "Invalid UDL",
-                (
-                    "Could not read the selected UDL file."
-                    f"\n\nError:\n{exc}"
-                ),
+                f"Could not read the selected UDL file.\n\nError:\n{exc}",
+            )
+
+    def _remote_fields_changed(self) -> None:
+        enabled = bool(
+            getattr(self, "remote_udl_path", None)
+            and Path(self.remote_udl_path).is_file()
+        )
+
+        if hasattr(self, "remote_test_button"):
+            self.remote_test_button.setEnabled(enabled)
+
+        if hasattr(self, "connect_button"):
+            self.connect_button.setEnabled(enabled)
+
+    def _test_remote_connection(self) -> bool:
+        if not self.remote_udl_path:
+            return False
+
+        self.remote_status.setText(
+            "Status: Testing connection..."
+        )
+
+        try:
+            connection = DatabaseConnection(
+                self.remote_udl_path
+            )
+
+            with connection.connect() as conn:
+                cursor = conn.cursor()
+                cursor.execute("SELECT 1")
+                cursor.fetchone()
+
+            self.remote_connection = connection
+
+            self.remote_status.setText(
+                "Status: Connection successful"
+            )
+
+            self._set_status(
+                "Remote / Client connection successful.",
+                "success",
+            )
+
+            return True
+
+        except Exception as exc:
+            self.remote_status.setText(
+                "Status: Connection failed"
+            )
+
+            self._set_status(
+                "Remote / Client connection failed.",
+                "error",
+            )
+
+            QMessageBox.critical(
+                self,
+                "Connection Failed",
+                f"Could not connect using the selected UDL.\n\nError:\n{exc}",
+            )
+
+            return False
+
+
+    # MODE
+    # ============================================================
+
+    def _connection_mode_changed(
+        self,
+        index: int = -1,
+    ) -> None:
+        del index
+
+        mode = self.connection_mode.currentData()
+
+        self.connection_type = str(mode or "udl")
+
+        is_remote = self.connection_type == "remote"
+
+        self.local_card.setVisible(not is_remote)
+        self.local_details_card.setVisible(not is_remote)
+        self.remote_card.setVisible(is_remote)
+
+        if is_remote:
+            self._remote_fields_changed()
+        else:
+            self.connect_button.setEnabled(
+                self._selected_udl() is not None
             )
 
     def _set_status(
@@ -1194,6 +1225,164 @@ class DatabaseSelector(QDialog):
     # REMOTE FIELDS
     # ============================================================
 
+    def _remote_fields_changed(
+        self,
+        value: str = "",
+    ) -> None:
+        del value
+
+        if self.connection_type != "remote":
+            return
+
+        required = (
+            self.store_name_edit.text().strip()
+            and self.server_edit.text().strip()
+            and self.database_edit.text().strip()
+            and self.username_edit.text().strip()
+            and self.password_edit.text()
+        )
+
+        self.remote_test_button.setEnabled(
+            bool(required)
+        )
+
+        self.connect_button.setEnabled(
+            bool(required)
+        )
+
+    def _test_remote_connection(self) -> bool:
+        server = (
+            self.server_edit.text().strip()
+        )
+
+        database = (
+            self.database_edit.text().strip()
+        )
+
+        username = (
+            self.username_edit.text().strip()
+        )
+
+        password = (
+            self.password_edit.text()
+        )
+
+        if not all(
+            [
+                server,
+                database,
+                username,
+                password,
+            ]
+        ):
+            QMessageBox.warning(
+                self,
+                "Missing Information",
+                "Please enter Server, Database, "
+                "Username and Password.",
+            )
+
+            return False
+
+        self.remote_status.setText(
+            "Status: Testing connection..."
+        )
+
+        try:
+            connection = (
+                DatabaseConnection.from_remote(
+                    server=server,
+                    database=database,
+                    username=username,
+                    password=password,
+                    driver="ODBC Driver 17 for SQL Server",
+                    encrypt=False,
+                    trust_server_certificate=True,
+                )
+            )
+
+            sql_connection = (
+                connection.connect()
+            )
+
+            try:
+                cursor = (
+                    sql_connection.cursor()
+                )
+
+                cursor.execute(
+                    "SELECT @@SERVERNAME, DB_NAME()"
+                )
+
+                row = cursor.fetchone()
+
+                cursor.close()
+
+            finally:
+                sql_connection.close()
+
+            self.server_name = (
+                connection.server_name()
+            )
+
+            self.database_name = (
+                connection.database_name()
+            )
+
+            self.remote_status.setText(
+                "Status: Connection successful "
+                f"({row[0]} / {row[1]})"
+            )
+
+            self.remote_status.setStyleSheet(
+                """
+                QLabel#detailLabel {
+                    color: #16803A;
+                    background: #ECF9F0;
+                    border: 1px solid #A9DFB9;
+                    font-weight: 700;
+                    padding: 6px;
+                    border-radius: 5px;
+                }
+                """
+            )
+
+            return True
+
+        except Exception as exc:
+            self.remote_status.setText(
+                "Status: Connection failed"
+            )
+
+            self.remote_status.setStyleSheet(
+                """
+                QLabel#detailLabel {
+                    color: #C62828;
+                    background: #FFF1F1;
+                    border: 1px solid #F0B8B8;
+                    font-weight: 700;
+                    padding: 6px;
+                    border-radius: 5px;
+                }
+                """
+            )
+
+            QMessageBox.critical(
+                self,
+                "Connection Failed",
+                "The remote SQL connection could not "
+                "be established.\n\n"
+                f"Server:\n{server}\n\n"
+                f"Database:\n{database}\n\n"
+                f"Error:\n{exc}",
+            )
+
+            return False
+
+    # ============================================================
+    # CONNECT
+    # ============================================================
+
     def _connect_selected(
         self,
         checked: bool = False,
@@ -1271,183 +1460,8 @@ class DatabaseSelector(QDialog):
                 f"Error:\n{exc}",
             )
 
-    # ============================================================
-    # REMOTE / CLIENT MODE
-    # ============================================================
-
-    def _connection_mode_changed(
-        self,
-        index: int = -1,
-    ) -> None:
-        del index
-
-        mode = self.connection_mode.currentData()
-
-        self.connection_type = str(mode or "udl")
-
-        is_remote = self.connection_type == "remote"
-
-        self.local_card.setVisible(not is_remote)
-        self.local_details_card.setVisible(not is_remote)
-        self.remote_card.setVisible(is_remote)
-
-        if is_remote:
-            self._remote_fields_changed()
-        else:
-            self.connect_button.setEnabled(
-                self._selected_udl() is not None
-            )
-
-
-    def _remote_fields_changed(self) -> None:
-        enabled = bool(
-            getattr(self, "remote_udl_path", None)
-            and Path(self.remote_udl_path).is_file()
-        )
-
-        if hasattr(self, "remote_test_button"):
-            self.remote_test_button.setEnabled(enabled)
-
-        if hasattr(self, "connect_button"):
-            self.connect_button.setEnabled(enabled)
-
-
-    def _test_remote_connection(self) -> bool:
-        udl_path = getattr(
-            self,
-            "remote_udl_path",
-            None,
-        )
-
-        if not udl_path:
-            self.remote_status.setStyleSheet("")
-            self.remote_status.setText(
-                "Status: Select a UDL file first."
-            )
-
-            self.connect_button.setEnabled(False)
-
-            return False
-
-        self.remote_status.setStyleSheet(
-            """
-            QLabel {
-                background-color: #f4f6f8;
-                color: #667085;
-                border-radius: 6px;
-                padding: 8px;
-            }
-            """
-        )
-
-        self.remote_status.setText(
-            "Status: Testing connection..."
-        )
-
-        self.remote_test_button.setEnabled(False)
-        self.connect_button.setEnabled(False)
-
-        try:
-            connection = getattr(
-                self,
-                "remote_connection",
-                None,
-            )
-
-            if connection is None:
-                connection = DatabaseConnection(
-                    udl_path
-                )
-
-            with connection.connect() as conn:
-                cursor = conn.cursor()
-                cursor.execute("SELECT 1")
-                cursor.fetchone()
-
-            self.remote_connection = connection
-
-            server = (
-                connection.server_name()
-                or "-"
-            )
-
-            database = (
-                connection.database_name()
-                or "-"
-            )
-
-            self.remote_status.setText(
-                "Status: Connection successful"
-            )
-
-            self.remote_status.setStyleSheet(
-                """
-                QLabel {
-                    background-color: #e8f7ee;
-                    color: #198754;
-                    border: 1px solid #b7e4c7;
-                    border-radius: 6px;
-                    padding: 8px;
-                    font-weight: 600;
-                }
-                """
-            )
-
-            self.remote_test_button.setEnabled(True)
-            self.connect_button.setEnabled(True)
-
-            self._set_status(
-                "Remote / Client connection successful.",
-                "success",
-            )
-
-            return True
-
-        except Exception as exc:
-            self.remote_status.setText(
-                "Status: Connection failed"
-            )
-
-            self.remote_status.setStyleSheet(
-                """
-                QLabel {
-                    background-color: #fdecec;
-                    color: #c62828;
-                    border: 1px solid #f5b5b5;
-                    border-radius: 6px;
-                    padding: 8px;
-                    font-weight: 600;
-                }
-                """
-            )
-
-            self.remote_test_button.setEnabled(True)
-            self.connect_button.setEnabled(False)
-
-            self._set_status(
-                "Remote / Client connection failed.",
-                "error",
-            )
-
-            QMessageBox.critical(
-                self,
-                "Connection Failed",
-                (
-                    "Could not connect using the selected UDL."
-                    f"\n\nError:\n{exc}"
-                ),
-            )
-
-            return False
-
     def _connect_remote(self) -> None:
-        udl_path = getattr(
-            self,
-            "remote_udl_path",
-            None,
-        )
-
-        if not udl_path:
+        if not self.remote_udl_path:
             QMessageBox.warning(
                 self,
                 "Remote / Client",
@@ -1455,34 +1469,19 @@ class DatabaseSelector(QDialog):
             )
             return
 
-        connection = getattr(
-            self,
-            "remote_connection",
-            None,
-        )
-
-        if connection is None:
-            QMessageBox.warning(
-                self,
-                "Remote / Client",
-                "Please test the connection before connecting.",
-            )
+        if not self._test_remote_connection():
             return
 
         try:
-            self.selected_udl = str(
-                udl_path
+            connection = DatabaseConnection(
+                self.remote_udl_path
             )
 
+            self.selected_udl = self.remote_udl_path
             self.remote_connection = connection
 
-            self.database_name = (
-                connection.database_name()
-            )
-
-            self.server_name = (
-                connection.server_name()
-            )
+            self.database_name = connection.database_name()
+            self.server_name = connection.server_name()
 
             self._set_status(
                 "Remote / Client connection successful.",
@@ -1500,27 +1499,8 @@ class DatabaseSelector(QDialog):
             QMessageBox.critical(
                 self,
                 "Connection Failed",
-                (
-                    "Could not activate the selected UDL."
-                    f"\n\nError:\n{exc}"
-                ),
+                f"Could not connect using the selected UDL.\n\nError:\n{exc}",
             )
-
-    def _get_last_folder(self) -> Path:
-        last_folder = str(
-            self._settings.value(
-                self.LAST_FOLDER_KEY,
-                "",
-            )
-            or ""
-        )
-
-        if last_folder:
-            folder = Path(last_folder).expanduser()
-            if folder.exists() and folder.is_dir():
-                return folder
-
-        return Path.home()
 
     def _save_last_folder(
         self,
