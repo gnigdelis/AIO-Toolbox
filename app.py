@@ -1,77 +1,61 @@
 from __future__ import annotations
 
-import ctypes
+import os
 import sys
-from pathlib import Path
 
 from PySide6.QtGui import QIcon
 from PySide6.QtWidgets import QApplication
 
-from ui.v2.main_window import MainWindow, create_application
+from core.scheduled_backup import run_scheduled_backup
+from ui.v2.main_window import MainWindow
 
 
-APP_ICON_PATH = (
-    Path(__file__).resolve().parent
-    / "assets"
-    / "branding"
-    / "window"
-    / "app.ico"
-)
+APP_ICON_PATH = "assets/branding/window/app.ico"
 
 
-def _set_windows_app_user_model_id() -> None:
-    """
-    Give Windows a unique AppUserModelID so the application
-    is correctly identified and grouped in the taskbar.
-    """
-    if sys.platform != "win32":
-        return
-
+def resource_path(relative_path: str) -> str:
     try:
-        ctypes.windll.shell32.SetCurrentProcessExplicitAppUserModelID(
-            "Sunsoft.AIO-Toolbox"
-        )
+        base_path = sys._MEIPASS
     except Exception:
-        pass
+        base_path = os.path.abspath(".")
 
-
-def _hide_console_when_frozen() -> None:
-    """
-    Hide the console window when running the frozen executable.
-    """
-    if not getattr(sys, "frozen", False):
-        return
-
-    try:
-        console_window = ctypes.windll.kernel32.GetConsoleWindow()
-
-        if console_window:
-            ctypes.windll.user32.ShowWindow(
-                console_window,
-                0,
-            )
-    except Exception:
-        pass
+    return os.path.join(
+        base_path,
+        relative_path,
+    )
 
 
 def main() -> int:
-    _set_windows_app_user_model_id()
-    _hide_console_when_frozen()
+    if "--scheduled-backup" in sys.argv:
+        return run_scheduled_backup()
 
-    application = create_application()
+    application = QApplication(sys.argv)
 
-    # Load the real AIO Toolbox application icon.
-    app_icon = QIcon(str(APP_ICON_PATH))
+    application.setApplicationName(
+        "AIO Toolbox"
+    )
+    application.setApplicationDisplayName(
+        "AIO Toolbox"
+    )
+    application.setOrganizationName(
+        "Sunsoft"
+    )
 
-    # Set the icon globally for Qt.
-    application.setWindowIcon(app_icon)
+    app_icon = QIcon(
+        resource_path(APP_ICON_PATH)
+    )
+
+    if not app_icon.isNull():
+        application.setWindowIcon(
+            app_icon
+        )
 
     window = MainWindow()
 
-    # Explicitly set it on the main window as well.
-    # This guarantees the icon appears in the title bar
-    # even if another window/component changes the default icon.
-    window.setWindowIcon(app_icon)
+    if not app_icon.isNull():
+        window.setWindowIcon(
+            app_icon
+        )
 
     window.show()
 
