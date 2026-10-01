@@ -8,6 +8,11 @@ from PySide6.QtWidgets import (
     QAbstractItemView,
     QCheckBox,
     QDateEdit,
+    QDialog,
+    QDialogButtonBox,
+    QListWidget,
+    QListWidgetItem,
+    QPlainTextEdit,
     QFrame,
     QHBoxLayout,
     QLabel,
@@ -66,7 +71,7 @@ class MyDataSendWorker(QThread):
 
                         if success:
                             invoice.mydata_state = "SENT"
-                            invoice.send_status = "SUCCESS"
+                            invoice.send_status = result.get("status_code")
                             invoice.send_message = (
                                 result.get("message")
                                 or "Document sent successfully."
@@ -77,13 +82,13 @@ class MyDataSendWorker(QThread):
                             )
                             invoice.impact_link = (
                                 result.get("impact_link")
-                                or result.get("url")
                                 or invoice.impact_link
                             )
                         else:
                             invoice.mydata_state = "PENDING"
                             invoice.send_status = (
-                                result.get("status")
+                                result.get("status_code")
+                                or result.get("status")
                                 or "FAILED"
                             )
                             invoice.send_message = (
@@ -189,8 +194,6 @@ class MyDataPage(QWidget):
         self.sent_invoices: list[MyDataInvoice] = []
 
         self.current_tab = "pending"
-        self.page_size = 100
-        self.current_page = 0
         self.worker: MyDataSendWorker | None = None
         self.search_worker: MyDataSearchWorker | None = None
 
@@ -664,16 +667,34 @@ class MyDataPage(QWidget):
         layout.setSpacing(6)
 
         title = QLabel(
-            "Documents with errors"
+            "Failed Documents"
         )
         title.setObjectName("cardTitle")
 
         self.failure_detail = QLabel()
         self.failure_detail.setWordWrap(True)
 
+        self.view_errors_button = QPushButton(
+            "View Errors"
+        )
+        self.view_errors_button.setObjectName(
+            "secondaryButton"
+        )
+        self.view_errors_button.setCursor(
+            Qt.CursorShape.PointingHandCursor
+        )
+        self.view_errors_button.clicked.connect(
+            self._show_failure_dialog
+        )
+
         layout.addWidget(title)
         layout.addWidget(
             self.failure_detail
+        )
+        layout.addWidget(
+            self.view_errors_button,
+            0,
+            Qt.AlignmentFlag.AlignLeft,
         )
 
         return self.failure_card
@@ -787,36 +808,6 @@ class MyDataPage(QWidget):
 
         layout.addWidget(self.table)
 
-        pagination = QHBoxLayout()
-        pagination.setContentsMargins(10, 8, 10, 8)
-        pagination.setSpacing(8)
-
-        self.previous_page_button = QPushButton("Previous")
-        self.previous_page_button.setObjectName("secondaryButton")
-        self.previous_page_button.setCursor(
-            Qt.CursorShape.PointingHandCursor
-        )
-
-        self.page_label = QLabel("Page 1 / 1")
-        self.page_label.setObjectName("myDataPageLabel")
-        self.page_label.setAlignment(
-            Qt.AlignmentFlag.AlignCenter
-        )
-
-        self.next_page_button = QPushButton("Next")
-        self.next_page_button.setObjectName("secondaryButton")
-        self.next_page_button.setCursor(
-            Qt.CursorShape.PointingHandCursor
-        )
-
-        pagination.addStretch()
-        pagination.addWidget(self.previous_page_button)
-        pagination.addWidget(self.page_label)
-        pagination.addWidget(self.next_page_button)
-        pagination.addStretch()
-
-        layout.addLayout(pagination)
-
         return container
 
     # ============================================================
@@ -882,7 +873,7 @@ class MyDataPage(QWidget):
             )
 
             self.connection_label.setText(
-                "β— Connected"
+                "● Connected"
             )
 
             self.connection_label.setProperty(
@@ -895,7 +886,7 @@ class MyDataPage(QWidget):
             )
 
             self.connection_label.setText(
-                "β— Not Connected"
+                "● Not Connected"
             )
 
             self.connection_label.setProperty(
@@ -985,13 +976,12 @@ class MyDataPage(QWidget):
         ]
 
         self.current_tab = "pending"
-        self.page_size = 100
-        self.current_page = 0
 
         self._update_tab_counts()
         self._update_tab_state()
         self._populate_table()
         self.failure_card.setVisible(False)
+        self._failed_invoices = []
 
         self.search_button.setText("Search Documents")
         self._set_controls_enabled(True)
@@ -1013,10 +1003,6 @@ class MyDataPage(QWidget):
             return
 
         self.search_worker = None
-
-        self.page_size = 100
-
-        self.current_page = 0
         worker.deleteLater()
 
     # ============================================================
@@ -1025,124 +1011,8 @@ class MyDataPage(QWidget):
 
     def _change_tab(self, tab: str) -> None:
         self.current_tab = tab
-        self.current_page = 0
 
         self._update_tab_state()
-        self._populate_table()
-
-    def _update_tab_counts(self) -> None:
-        self.pending_tab.setText(
-            f"Pending ({len(self.pending_invoices)})"
-        )
-
-        self.sent_tab.setText(
-            f"Sent ({len(self.sent_invoices)})"
-        )
-
-    def _update_tab_state(self) -> None:
-        pending = (
-            self.current_tab == "pending"
-        )
-
-        self.pending_tab.setChecked(
-            pending
-        )
-
-        self.sent_tab.setChecked(
-            not pending
-        )
-
-        self.select_all_button.setEnabled(
-            pending
-        )
-
-        self.send_selected_button.setEnabled(
-            pending
-            and bool(self.pending_invoices)
-        )
-
-        self.send_all_button.setEnabled(
-            pending
-            and bool(self.pending_invoices)
-        )
-
-    def _current_invoices(
-        self,
-    ) -> list[MyDataInvoice]:
-        if self.current_tab == "sent":
-            return self.sent_invoices
-
-        return self.pending_invoices
-
-    def _page_count(self) -> int:
-        total = len(
-            self._current_invoices()
-        )
-
-        if total <= 0:
-            return 1
-
-        return (
-            total
-            + self.page_size
-            - 1
-        ) // self.page_size
-
-    def _visible_invoices(
-        self,
-    ) -> list[MyDataInvoice]:
-        invoices = self._current_invoices()
-
-        start = (
-            self.current_page
-            * self.page_size
-        )
-
-        end = start + self.page_size
-
-        return invoices[start:end]
-
-    def _update_pagination_controls(self) -> None:
-        total = len(
-            self._current_invoices()
-        )
-
-        pages = self._page_count()
-
-        if self.current_page >= pages:
-            self.current_page = max(
-                0,
-                pages - 1,
-            )
-
-        self.page_label.setText(
-            f"Page {self.current_page + 1} / {pages}"
-            f"   ({total} documents)"
-        )
-
-        self.previous_page_button.setEnabled(
-            self.current_page > 0
-        )
-
-        self.next_page_button.setEnabled(
-            self.current_page < pages - 1
-        )
-
-    def _previous_page(self) -> None:
-        if self.current_page <= 0:
-            return
-
-        self.current_page -= 1
-        self._populate_table()
-
-    def _next_page(self) -> None:
-        if (
-            self.current_page
-            >= self._page_count() - 1
-        ):
-            return
-
-        self.current_page += 1
         self._populate_table()
 
     def _update_tab_counts(self) -> None:
@@ -1189,177 +1059,97 @@ class MyDataPage(QWidget):
         return self.pending_invoices
 
     def _populate_table(self) -> None:
-        invoices = self._visible_invoices()
-        show_checkboxes = (
-            self.current_tab != "sent"
-        )
+        """Populate the table efficiently, including large Sent result sets.
 
-        table = self.table
+        Sent documents can easily contain many thousands of rows. Creating a
+        QWidget/QCheckBox for every row makes Qt spend a very long time laying
+        out child widgets and can make the application appear frozen.
 
-        table.setUpdatesEnabled(False)
-        table.setSortingEnabled(False)
+        Only Pending rows need checkboxes because the send actions operate on
+        Pending documents. Sent rows therefore use plain table items only.
+        The row count is allocated once instead of repeatedly calling
+        insertRow(), which also reduces the cost substantially.
+        """
+        invoices = self._current_invoices()
+        is_pending_tab = self.current_tab == "pending"
+
+        self.table.setUpdatesEnabled(False)
+        self.table.blockSignals(True)
 
         try:
-            table.clearContents()
-            table.setRowCount(
-                len(invoices)
-            )
+            self.table.clearContents()
+            self.table.setRowCount(len(invoices))
 
-            center = Qt.AlignmentFlag.AlignCenter
-
-            for row, invoice in enumerate(
-                invoices
-            ):
-                if show_checkboxes:
+            for row, invoice in enumerate(invoices):
+                # Checkboxes are only needed for Pending documents. Sent can
+                # contain many thousands of rows, so avoid one QWidget per row.
+                if is_pending_tab:
                     checkbox = QCheckBox()
-
                     checkbox.setProperty(
                         "invoice_id",
                         invoice.invoice_id,
                     )
 
                     checkbox_widget = QWidget()
-
                     checkbox_layout = QHBoxLayout(
                         checkbox_widget
                     )
-
-                    checkbox_layout.setContentsMargins(
-                        0,
-                        0,
-                        0,
-                        0,
-                    )
-
+                    checkbox_layout.setContentsMargins(0, 0, 0, 0)
                     checkbox_layout.setAlignment(
-                        center
+                        Qt.AlignmentFlag.AlignCenter
                     )
+                    checkbox_layout.addWidget(checkbox)
 
-                    checkbox_layout.addWidget(
-                        checkbox
-                    )
-
-                    table.setCellWidget(
+                    self.table.setCellWidget(
                         row,
                         0,
                         checkbox_widget,
                     )
-                else:
-                    self._set_item(
-                        row,
-                        0,
-                        "",
-                    )
 
-                self._set_item(
-                    row,
-                    1,
-                    invoice.invoice_type,
-                )
-
-                self._set_item(
-                    row,
-                    2,
-                    invoice.document_name,
-                )
-
-                self._set_item(
-                    row,
-                    3,
-                    invoice.issue_date,
-                )
-
-                self._set_item(
-                    row,
-                    4,
-                    invoice.aa,
-                )
-
-                self._set_item(
-                    row,
-                    5,
-                    invoice.cust_afm,
-                )
-
-                self._set_item(
-                    row,
-                    6,
-                    invoice.invoice_id,
-                )
+                self._set_item(row, 1, invoice.invoice_type)
+                self._set_item(row, 2, invoice.document_name)
+                self._set_item(row, 3, invoice.issue_date)
+                self._set_item(row, 4, invoice.aa)
+                self._set_item(row, 5, invoice.cust_afm)
+                self._set_item(row, 6, invoice.invoice_id)
 
                 status = (
                     "SENT"
-                    if str(
-                        invoice.mydata_state
-                    ).upper()
-                    == "SENT"
+                    if str(invoice.mydata_state).upper() == "SENT"
                     else "PENDING"
                 )
-
-                status_item = QTableWidgetItem(
-                    status
-                )
-
+                status_item = QTableWidgetItem(status)
                 status_item.setTextAlignment(
-                    center
+                    Qt.AlignmentFlag.AlignCenter
                 )
-
-                table.setItem(
-                    row,
-                    7,
-                    status_item,
-                )
-
-                mark = (
-                    str(invoice.mark)
-                    if invoice.mark
-                    else "-"
-                )
+                self.table.setItem(row, 7, status_item)
 
                 mark_item = QTableWidgetItem(
-                    mark
+                    str(invoice.mark) if invoice.mark else "-"
                 )
-
                 mark_item.setTextAlignment(
-                    center
+                    Qt.AlignmentFlag.AlignCenter
                 )
-
-                table.setItem(
-                    row,
-                    8,
-                    mark_item,
-                )
+                self.table.setItem(row, 8, mark_item)
 
                 impact_item = QTableWidgetItem()
-
                 if invoice.impact_link:
-                    impact_item.setText(
-                        "Open"
-                    )
-
+                    impact_item.setText("Open")
                     impact_item.setData(
                         Qt.ItemDataRole.UserRole,
                         invoice.impact_link,
                     )
                 else:
-                    impact_item.setText(
-                        "-"
-                    )
+                    impact_item.setText("-")
 
                 impact_item.setTextAlignment(
-                    center
+                    Qt.AlignmentFlag.AlignCenter
                 )
-
-                table.setItem(
-                    row,
-                    9,
-                    impact_item,
-                )
-
+                self.table.setItem(row, 9, impact_item)
         finally:
-            table.setUpdatesEnabled(True)
-
-        self._update_pagination_controls()
+            self.table.blockSignals(False)
+            self.table.setUpdatesEnabled(True)
+            self.table.viewport().update()
 
     def _set_item(
         self,
@@ -1429,7 +1219,7 @@ class MyDataPage(QWidget):
     def _selected_invoices(
         self,
     ) -> list[MyDataInvoice]:
-        invoices = self._visible_invoices()
+        invoices = self._current_invoices()
 
         selected: list[MyDataInvoice] = []
 
@@ -1458,6 +1248,10 @@ class MyDataPage(QWidget):
                 )
 
         return selected
+
+    # ============================================================
+    # SEND
+    # ============================================================
 
     def _send_selected(self) -> None:
         invoices = self._selected_invoices()
@@ -1508,6 +1302,7 @@ class MyDataPage(QWidget):
 
         self.progress_card.setVisible(True)
         self.failure_card.setVisible(False)
+        self._failed_invoices = []
 
         self.progress_bar.setValue(0)
         self.progress_bar.setMaximum(100)
@@ -1699,7 +1494,7 @@ class MyDataPage(QWidget):
         self,
         invoice: MyDataInvoice,
     ) -> None:
-        invoices = self._visible_invoices()
+        invoices = self._current_invoices()
 
         try:
             row = next(
@@ -1755,32 +1550,122 @@ class MyDataPage(QWidget):
             impact,
         )
 
+    # ============================================================
+    # FAILURES
+    # ============================================================
+
     def _show_failures(
         self,
         invoices: list[MyDataInvoice],
     ) -> None:
-        lines = []
+        self._failed_invoices = list(invoices)
 
-        for invoice in invoices[:20]:
-            message = (
-                invoice.send_message
-                or "Unknown error"
-            )
-
-            lines.append(
-                f"{invoice.document_name}: {message}"
-            )
-
-        if len(invoices) > 20:
-            lines.append(
-                f"... and {len(invoices) - 20} more."
-            )
-
+        count = len(invoices)
         self.failure_detail.setText(
-            "\n".join(lines)
+            f"{count} document(s) failed to send. "
+            "Click View Errors to inspect each failure."
         )
 
+        self.view_errors_button.setEnabled(
+            bool(invoices)
+        )
         self.failure_card.setVisible(True)
+
+    def _show_failure_dialog(self) -> None:
+        invoices = getattr(
+            self,
+            "_failed_invoices",
+            [],
+        )
+
+        if not invoices:
+            return
+
+        dialog = QDialog(self)
+        dialog.setWindowTitle("Failed Documents")
+        dialog.setMinimumSize(760, 460)
+
+        layout = QVBoxLayout(dialog)
+        layout.setContentsMargins(18, 18, 18, 18)
+        layout.setSpacing(10)
+
+        summary = QLabel(
+            f"{len(invoices)} document(s) failed to send. "
+            "Select a document to view its error."
+        )
+        summary.setObjectName("cardTitle")
+        layout.addWidget(summary)
+
+        content = QHBoxLayout()
+        content.setSpacing(12)
+
+        document_list = QListWidget()
+        document_list.setMinimumWidth(300)
+
+        details = QPlainTextEdit()
+        details.setReadOnly(True)
+        details.setPlaceholderText(
+            "Select a failed document to view the error."
+        )
+
+        for invoice in invoices:
+            aa = str(invoice.aa or "-")
+            name = str(invoice.document_name or "Document")
+            item = QListWidgetItem(
+                f"A/A {aa}  |  {name}"
+            )
+            item.setData(
+                Qt.ItemDataRole.UserRole,
+                invoice,
+            )
+            document_list.addItem(item)
+
+        def show_item_error(item: QListWidgetItem) -> None:
+            invoice = item.data(
+                Qt.ItemDataRole.UserRole
+            )
+
+            status = (
+                invoice.send_status
+                if invoice.send_status not in (None, "")
+                else "-"
+            )
+            message = (
+                invoice.send_message
+                or "Unknown error."
+            )
+
+            details.setPlainText(
+                f"Document: {invoice.document_name or '-'}\n"
+                f"A/A: {invoice.aa or '-'}\n"
+                f"Invoice ID: {invoice.invoice_id}\n"
+                f"HTTP Status: {status}\n\n"
+                f"Error:\n{message}"
+            )
+
+        document_list.currentItemChanged.connect(
+            lambda current, previous: (
+                show_item_error(current)
+                if current is not None
+                else None
+            )
+        )
+
+        content.addWidget(document_list, 1)
+        content.addWidget(details, 2)
+        layout.addLayout(content, 1)
+
+        buttons = QDialogButtonBox(
+            QDialogButtonBox.StandardButton.Close
+        )
+        buttons.rejected.connect(dialog.reject)
+        buttons.accepted.connect(dialog.accept)
+        layout.addWidget(buttons)
+
+        if document_list.count():
+            document_list.setCurrentRow(0)
+
+        dialog.exec()
 
     # ============================================================
     # ACTIONS

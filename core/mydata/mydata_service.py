@@ -34,184 +34,220 @@ class MyDataService:
 
     SEND_USER_ID = 3
 
+    # The old implementation queried VSnMyDATAInvoicesAMV directly.
+    # That view performs full-table response aggregation and is very slow.
+    # The optimized search builds the small candidate set first, then resolves
+    # response metadata only for those candidates.
+    #
+    # IMPORTANT: all temporary tables are created and consumed inside ONE SQL
+    # batch. This avoids temp-table scope issues with the ODBC driver.
     SEARCH_SQL = """
-    WITH HistoricalInvoices AS
-    (
-        SELECT
-            p.SalesTransPosHdr AS InvoiceId,
-            MAX(s.SalesTransNoteCode) AS NoteCode,
-            MAX(s.SalesTransNoteNo) AS NoteNo,
-            MAX(s.SalesTransRealDate) AS RealDate,
-            MAX(s.SalesTransBeginTime) AS BeginTime,
-            MAX(s.SalesTransOtherNoteNo) AS OtherNoteNo,
-            MAX(s.SalesTransOID) AS SalesTransOID
-        FROM TblSnSalesTransPos p
-        INNER JOIN TblSnSalesTrans s
-            ON s.SalesTransOID = p.SalesTransOID
-        WHERE
-            s.SalesTransRealDate >= CONVERT(date, ?, 112)
-            AND s.SalesTransRealDate <
-                DATEADD(day, 1, CONVERT(date, ?, 112))
-            AND EXISTS
+    SET NOCOUNT ON;
+
+    SELECT DISTINCT
+        stp.SalesTransPosHdr AS InvoiceId,
+        st.SalesTransOrderIssuedTime AS IssueDate,
+        st.SalesTransNoteNo AS AA,
+        nts.MyDATA_NoteTypeSubCategCode AS InvoiceType,
+        nt.NoteTypeDescr AS DocumentName,
+        CASE
+            WHEN cus.CustExternal = 1
+                THEN NULLIF(ISNULL(cus.CustVATNumber, ''), '')
+            ELSE NULLIF(ISNULL(cus.CustAFM, ''), '')
+        END AS CustAFM
+    INTO #MyDataCandidates
+    FROM VSnVSalesTrans st WITH (NOLOCK)
+    INNER JOIN VSnVSalesTransPos stp WITH (NOLOCK)
+        ON st.SalesTransOID = stp.SalesTransOID
+    INNER JOIN VSnVSalesPayWay spw WITH (NOLOCK)
+        ON stp.SalesTransPosHdr = spw.SalesPWPosHdr
+    INNER JOIN TblSnPayWay pw WITH (NOLOCK)
+        ON spw.PayWayOID = pw.PayWayOID
+    INNER JOIN VSnVatPercentFull vp WITH (NOLOCK)
+        ON st.VatPercentOID = vp.VatPercentOID
+    INNER JOIN TblSnShopItem si WITH (NOLOCK)
+        ON st.ShopItemOID = si.ShopItemOID
+    INNER JOIN TblSnItem i WITH (NOLOCK)
+        ON si.ItemOID = i.ItemOID
+    INNER JOIN TblSnFinYear fy WITH (NOLOCK)
+        ON st.FinYearOID = fy.FinYearOID
+    INNER JOIN TblSnCustomer cus WITH (NOLOCK)
+        ON st.CustomerOID = cus.CustomerOID
+    INNER JOIN TblSnSalesStation ss WITH (NOLOCK)
+        ON st.SalesStationOID = ss.SalesStationOID
+    INNER JOIN TblSnShop shop WITH (NOLOCK)
+        ON ss.ShopOID = shop.ShopOID
+    INNER JOIN TblSnNoteType nt WITH (NOLOCK)
+        ON st.SalesTransNoteCode = nt.NoteTypeOID
+    LEFT JOIN TblSnMyDATA_NoteTypeSubCateg nts WITH (NOLOCK)
+        ON nt.MyDATA_NoteTypeSubCategOID = nts.MyDATA_NoteTypeSubCategOID
+    INNER JOIN TblSnDataBase db WITH (NOLOCK)
+        ON st.DataBaseOID = db.DataBaseOID
+    WHERE
+        st.SalesTransOrderIssuedTime >= CONVERT(datetime, ?, 112)
+        AND st.SalesTransOrderIssuedTime < DATEADD(
+            day, 1, CONVERT(datetime, ?, 112)
+        )
+        AND ISNULL(nt.NoteTypeMyDATAIncluded, 0) = 1
+        AND nt.MyDATA_NoteTypeSubCategOID IS NOT NULL
+        AND cus.CustMyDATAIncluded = 1
+        AND st.SalesTransInitDate >= shop.ShopAMVProviderStartDate
+        AND (
             (
-                SELECT 1
-                FROM TblSnMyDATA_Response r0
-                WHERE
-                    r0.MyDATA_ResponseSalesTransPosHdr =
-                        p.SalesTransPosHdr
+                i.ItemNonPrintable = 0
+                AND nt.NoteTypeGroupPos > 2
             )
-        GROUP BY
-            p.SalesTransPosHdr
-    ),
+            OR (
+                i.ItemNonPrintable = 0
+                AND nt.NoteTypeGroupPos <= 2
+                AND nt.NoteTypeIssue = 1
+            )
+            OR (
+                nt.NoteTypeGroupPos <= 2
+                AND nt.NoteTypeIssue = 0
+            )
+        )
+        AND stp.SalesTransPosItemFlag NOT IN (10)
+        AND (
+            st.SalesTransCashGrs > 0
+            OR nts.MyDATA_NoteTypeSubCategCode = '9.3'
+            OR stp.SalesTransPosItemFlag = 14
+        )
+        AND db.DataBaseLocal = 1
+        AND shop.ShopAMVProviderEnabled = 1;
 
-    HistoricalWithResponse AS
-    (
-        SELECT
-            h.InvoiceId,
-            h.NoteCode,
-            h.NoteNo,
-            h.RealDate,
-            h.BeginTime,
-            h.OtherNoteNo,
-            h.SalesTransOID,
+    CREATE UNIQUE CLUSTERED INDEX IX_MyDataCandidates
+        ON #MyDataCandidates (InvoiceId);
 
-            CASE
-                WHEN SuccessResponse.HasSuccess = 1
-                    THEN 'SENT'
-                ELSE 'PENDING'
-            END AS MyDataState,
+    SELECT
+        c.InvoiceId,
+        MAX(r.MyDATA_ResponseOID) AS LastResponseOID
+    INTO #MyDataLatestResponse
+    FROM #MyDataCandidates c
+    INNER JOIN TblSnMyDATA_Response r WITH (NOLOCK)
+        ON r.MyDATA_ResponseSalesTransPosHdr = c.InvoiceId
+    GROUP BY c.InvoiceId;
 
-            SuccessResponse.MyDATA_ResponseInvoiceMARK AS MARK,
-            SuccessResponse.MyDATA_ResponseProviderQRCodeLink AS ImpactLink,
-            SuccessResponse.MyDATA_ResponseTransactorTRN AS CustAFM
+    CREATE UNIQUE CLUSTERED INDEX IX_MyDataLatestResponse
+        ON #MyDataLatestResponse (InvoiceId);
 
-        FROM HistoricalInvoices h
+    SELECT
+        c.InvoiceId,
+        MAX(r.MyDATA_ResponseOID) AS LastSuccessOID
+    INTO #MyDataLatestSuccess
+    FROM #MyDataCandidates c
+    INNER JOIN TblSnMyDATA_Response r WITH (NOLOCK)
+        ON r.MyDATA_ResponseSalesTransPosHdr = c.InvoiceId
+    WHERE r.MyDATA_ResponseStatusCode = 'Success'
+    GROUP BY c.InvoiceId;
 
-        OUTER APPLY
+    CREATE UNIQUE CLUSTERED INDEX IX_MyDataLatestSuccess
+        ON #MyDataLatestSuccess (InvoiceId);
+
+    SELECT
+        p.SalesTransPosHdr AS InvoiceId,
+        MAX(s.SalesTransNoteCode) AS NoteCode,
+        MAX(s.SalesTransNoteNo) AS NoteNo,
+        MAX(s.SalesTransRealDate) AS RealDate,
+        MAX(s.SalesTransBeginTime) AS BeginTime,
+        MAX(s.SalesTransOtherNoteNo) AS OtherNoteNo,
+        MAX(s.SalesTransOID) AS SalesTransOID
+    INTO #MyDataHistorical
+    FROM TblSnSalesTransPos p WITH (NOLOCK)
+    INNER JOIN TblSnSalesTrans s WITH (NOLOCK)
+        ON s.SalesTransOID = p.SalesTransOID
+    WHERE
+        CONVERT(date, s.SalesTransRealDate)
+            BETWEEN CONVERT(date, ?, 112)
+            AND CONVERT(date, ?, 112)
+        AND EXISTS
         (
-            SELECT TOP 1
-                1 AS HasSuccess,
-                r.MyDATA_ResponseInvoiceMARK,
-                r.MyDATA_ResponseProviderQRCodeLink,
-                r.MyDATA_ResponseTransactorTRN
-            FROM TblSnMyDATA_Response r
-            WHERE
-                r.MyDATA_ResponseSalesTransPosHdr = h.InvoiceId
-                AND r.MyDATA_ResponseStatusCode = 'Success'
-            ORDER BY r.MyDATA_ResponseOID DESC
-        ) AS SuccessResponse
-    ),
+            SELECT 1
+            FROM TblSnMyDATA_Response r0 WITH (NOLOCK)
+            WHERE r0.MyDATA_ResponseSalesTransPosHdr = p.SalesTransPosHdr
+        )
+    GROUP BY p.SalesTransPosHdr;
 
-    CurrentInvoices AS
-    (
-        SELECT DISTINCT
-            CAST(invoiceType AS NVARCHAR(64)) AS InvoiceType,
-            CAST(DocumentType AS NVARCHAR(256)) AS DocumentName,
-            CONVERT(varchar(10), issueDate, 23) AS IssueDate,
-            aa,
-            InvoiceId,
-            CustAFM
-        FROM VSnMyDATAInvoicesAMV
-        WHERE
-            issueDate >= CONVERT(date, ?, 112)
-            AND issueDate <
-                DATEADD(day, 1, CONVERT(date, ?, 112))
-    ),
-
-    CurrentWithResponse AS
-    (
-        SELECT
-            c.InvoiceType,
-            c.DocumentName,
-            c.IssueDate,
-            c.aa,
-            c.InvoiceId,
-            c.CustAFM,
-
-            CASE
-                WHEN SuccessResponse.HasSuccess = 1
-                    THEN 'SENT'
-                ELSE 'PENDING'
-            END AS MyDataState,
-
-            ISNULL(
-                SuccessResponse.MyDATA_ResponseInvoiceMARK,
-                ''
-            ) AS MARK,
-
-            ISNULL(
-                SuccessResponse.MyDATA_ResponseProviderQRCodeLink,
-                ''
-            ) AS ImpactLink
-
-        FROM CurrentInvoices c
-
-        OUTER APPLY
-        (
-            SELECT TOP 1
-                1 AS HasSuccess,
-                r.MyDATA_ResponseInvoiceMARK,
-                r.MyDATA_ResponseProviderQRCodeLink
-            FROM TblSnMyDATA_Response r
-            WHERE
-                r.MyDATA_ResponseSalesTransPosHdr = c.InvoiceId
-                AND r.MyDATA_ResponseStatusCode = 'Success'
-            ORDER BY r.MyDATA_ResponseOID DESC
-        ) AS SuccessResponse
-    )
+    CREATE UNIQUE CLUSTERED INDEX IX_MyDataHistorical
+        ON #MyDataHistorical (InvoiceId);
 
     SELECT
         CAST(
             CASE
                 WHEN h.NoteCode IS NULL THEN ''
                 ELSE CAST(h.NoteCode AS NVARCHAR(64))
-            END
-            AS NVARCHAR(64)
+            END AS NVARCHAR(64)
         ) AS InvoiceType,
-
         CAST(
             CASE
                 WHEN h.NoteCode IS NULL THEN 'MyDATA'
                 ELSE 'Document ' + CAST(h.NoteCode AS NVARCHAR(64))
-            END
-            AS NVARCHAR(256)
+            END AS NVARCHAR(256)
         ) AS DocumentName,
-
         CONVERT(varchar(10), h.RealDate, 23) AS IssueDate,
         CAST(h.NoteNo AS NVARCHAR(64)) AS AA,
         h.InvoiceId,
-        ISNULL(h.CustAFM, '') AS CustAFM,
-        h.MyDataState,
-        ISNULL(h.MARK, '') AS MARK,
-        ISNULL(h.ImpactLink, '') AS ImpactLink
+        ISNULL(sr.MyDATA_ResponseTransactorTRN, '') AS CustAFM,
+        CASE
+            WHEN sr.MyDATA_ResponseOID IS NOT NULL
+                THEN 'SENT'
+            ELSE 'PENDING'
+        END AS MyDataState,
+        ISNULL(sr.MyDATA_ResponseInvoiceMARK, '') AS MARK,
+        ISNULL(sr.MyDATA_ResponseProviderQRCodeLink, '') AS ImpactLink
+    FROM #MyDataHistorical h
+    OUTER APPLY
+    (
+        SELECT TOP 1
+            r.MyDATA_ResponseOID,
+            r.MyDATA_ResponseInvoiceMARK,
+            r.MyDATA_ResponseProviderQRCodeLink,
+            r.MyDATA_ResponseTransactorTRN
+        FROM TblSnMyDATA_Response r WITH (NOLOCK)
+        WHERE
+            r.MyDATA_ResponseSalesTransPosHdr = h.InvoiceId
+            AND r.MyDATA_ResponseStatusCode = 'Success'
+        ORDER BY r.MyDATA_ResponseOID DESC
+    ) sr
 
-    FROM HistoricalWithResponse h
-
-    UNION
+    UNION ALL
 
     SELECT
-        c.InvoiceType,
-        c.DocumentName,
-        c.IssueDate,
-        c.aa,
+        CAST(c.InvoiceType AS NVARCHAR(64)) AS InvoiceType,
+        CAST(c.DocumentName AS NVARCHAR(256)) AS DocumentName,
+        CONVERT(varchar(10), c.IssueDate, 23) AS IssueDate,
+        CAST(c.AA AS NVARCHAR(64)) AS AA,
         c.InvoiceId,
-        c.CustAFM,
-        c.MyDataState,
-        c.MARK,
-        c.ImpactLink
+        ISNULL(c.CustAFM, '') AS CustAFM,
+        CASE
+            WHEN sr.MyDATA_ResponseOID IS NOT NULL
+                THEN 'SENT'
+            ELSE 'PENDING'
+        END AS MyDataState,
+        ISNULL(sr.MyDATA_ResponseInvoiceMARK, '') AS MARK,
+        ISNULL(sr.MyDATA_ResponseProviderQRCodeLink, '') AS ImpactLink
+    FROM #MyDataCandidates c
+    LEFT JOIN #MyDataLatestResponse lr
+        ON lr.InvoiceId = c.InvoiceId
+    LEFT JOIN TblSnMyDATA_Response latest WITH (NOLOCK)
+        ON latest.MyDATA_ResponseOID = lr.LastResponseOID
+    LEFT JOIN #MyDataLatestSuccess ls
+        ON ls.InvoiceId = c.InvoiceId
+    LEFT JOIN TblSnMyDATA_Response sr WITH (NOLOCK)
+        ON sr.MyDATA_ResponseOID = ls.LastSuccessOID
+    WHERE
+        NOT EXISTS
+        (
+            SELECT 1
+            FROM #MyDataHistorical h
+            WHERE h.InvoiceId = c.InvoiceId
+        )
+        -- Do not filter on MyDATA_ResponseUpdated here.
+        -- A response with Updated=1 can be a successfully sent document
+        -- and must remain visible in the SENT tab. The state is determined
+        -- by the existence of the latest successful response above.
 
-    FROM CurrentWithResponse c
-
-    WHERE NOT EXISTS
-    (
-        SELECT 1
-        FROM HistoricalInvoices h
-        WHERE h.InvoiceId = c.InvoiceId
-    )
-
-    ORDER BY
-        IssueDate,
-        AA
+    ORDER BY IssueDate, AA;
     """
 
     def _get_connection(self):
@@ -222,10 +258,7 @@ class MyDataService:
                 "Δεν έχει επιλεγεί βάση δεδομένων."
             )
 
-        database = DatabaseConnection(
-            udl_path
-        )
-
+        database = DatabaseConnection(udl_path)
         return database.connect()
 
     def search(
@@ -233,12 +266,15 @@ class MyDataService:
         start_date: str,
         end_date: str,
     ) -> list[MyDataInvoice]:
+        """Search myDATA documents using the optimized single SQL batch."""
 
         connection = self._get_connection()
 
         try:
             cursor = connection.cursor()
 
+            # One execute is intentional: SQL Server local temp tables must
+            # remain in the same ODBC session/batch used to consume them.
             cursor.execute(
                 self.SEARCH_SQL,
                 start_date,
@@ -246,6 +282,16 @@ class MyDataService:
                 start_date,
                 end_date,
             )
+
+            # The batch contains SELECT INTO / CREATE INDEX statements
+            # before the final SELECT. ODBC exposes those as intermediate
+            # result sets with no columns, so advance to the first real
+            # result set before calling fetchall().
+            while cursor.description is None:
+                if not cursor.nextset():
+                    raise RuntimeError(
+                        "Η αναζήτηση δεν επέστρεψε αποτέλεσμα."
+                    )
 
             rows = cursor.fetchall()
 
@@ -256,47 +302,25 @@ class MyDataService:
                     row[6] or "PENDING"
                 ).upper()
 
-                if mydata_state not in (
-                    "SENT",
-                    "PENDING",
-                ):
+                if mydata_state not in ("SENT", "PENDING"):
                     mydata_state = "PENDING"
 
                 invoices.append(
                     MyDataInvoice(
-                        invoice_type=str(
-                            row[0] or ""
-                        ),
-                        document_name=str(
-                            row[1] or ""
-                        ),
-                        issue_date=str(
-                            row[2] or ""
-                        ),
-                        aa=str(
-                            row[3] or ""
-                        ),
-                        invoice_id=int(
-                            row[4]
-                        ),
-                        cust_afm=str(
-                            row[5] or ""
-                        ),
-                        sent=(
-                            mydata_state == "SENT"
-                        ),
-                        mark=str(
-                            row[7] or ""
-                        ),
-                        impact_link=str(
-                            row[8] or ""
-                        ),
+                        invoice_type=str(row[0] or ""),
+                        document_name=str(row[1] or ""),
+                        issue_date=str(row[2] or ""),
+                        aa=str(row[3] or ""),
+                        invoice_id=int(row[4]),
+                        cust_afm=str(row[5] or ""),
+                        sent=(mydata_state == "SENT"),
+                        mark=str(row[7] or ""),
+                        impact_link=str(row[8] or ""),
                         mydata_state=mydata_state,
                     )
                 )
 
             cursor.close()
-
             return invoices
 
         finally:
@@ -306,7 +330,6 @@ class MyDataService:
         self,
         invoice_id: int,
     ) -> tuple[str, str]:
-
         connection = self._get_connection()
 
         try:
@@ -315,15 +338,9 @@ class MyDataService:
             cursor.execute(
                 """
                 SELECT TOP 1
-                    ISNULL(
-                        MyDATA_ResponseInvoiceMARK,
-                        ''
-                    ),
-                    ISNULL(
-                        MyDATA_ResponseProviderQRCodeLink,
-                        ''
-                    )
-                FROM TblSnMyDATA_Response
+                    ISNULL(MyDATA_ResponseInvoiceMARK, ''),
+                    ISNULL(MyDATA_ResponseProviderQRCodeLink, '')
+                FROM TblSnMyDATA_Response WITH (NOLOCK)
                 WHERE
                     MyDATA_ResponseSalesTransPosHdr = ?
                     AND MyDATA_ResponseStatusCode = 'Success'
@@ -333,16 +350,12 @@ class MyDataService:
             )
 
             row = cursor.fetchone()
-
             cursor.close()
 
             if not row:
                 return "", ""
 
-            return (
-                str(row[0] or ""),
-                str(row[1] or ""),
-            )
+            return str(row[0] or ""), str(row[1] or "")
 
         finally:
             connection.close()
@@ -351,7 +364,6 @@ class MyDataService:
         self,
         invoice_id: int,
     ) -> dict:
-
         url = (
             f"{self.API_BASE_URL}"
             "/api/TaxProvider/SendInvoice/1/0/1/1/0"
@@ -369,36 +381,23 @@ class MyDataService:
         )
 
         message = response.text.strip()
-
         impact_link = ""
 
-        if message.startswith(
-            "https://einvoice.impact.gr/"
-        ):
+        if message.startswith("https://einvoice.impact.gr/"):
             impact_link = message
 
         mark = ""
 
         if response.status_code == 200:
             try:
-                db_mark, db_link = (
-                    self._get_response_metadata(
-                        invoice_id
-                    )
-                )
-
+                db_mark, db_link = self._get_response_metadata(invoice_id)
                 mark = db_mark
-                impact_link = (
-                    db_link or impact_link
-                )
-
+                impact_link = db_link or impact_link
             except Exception:
                 pass
 
         return {
-            "success": (
-                response.status_code == 200
-            ),
+            "success": response.status_code == 200,
             "status_code": response.status_code,
             "message": message,
             "mark": mark,
@@ -406,64 +405,23 @@ class MyDataService:
             "url": response.url,
         }
 
-    def send_invoices(
-        self,
-        invoices,
-    ) -> list[dict]:
-
+    def send_invoices(self, invoices) -> list[dict]:
         results = []
 
         for invoice in invoices:
             try:
-                result = self.send_invoice(
-                    invoice.invoice_id
-                )
+                result = self.send_invoice(invoice.invoice_id)
 
-                invoice.send_status = (
-                    result["status_code"]
-                )
-
-                invoice.send_message = (
-                    result.get(
-                        "message",
-                        "",
-                    )
-                    or ""
-                )
-
-                invoice.impact_link = (
-                    result.get(
-                        "impact_link",
-                        "",
-                    )
-                    or ""
-                )
-
+                invoice.send_status = result["status_code"]
+                invoice.send_message = result.get("message", "") or ""
+                invoice.impact_link = result.get("impact_link", "") or ""
                 invoice.mark = (
-                    result.get(
-                        "mark",
-                        "",
-                    )
-                    or getattr(
-                        invoice,
-                        "mark",
-                        "",
-                    )
+                    result.get("mark", "")
+                    or getattr(invoice, "mark", "")
                     or ""
                 )
-
-                invoice.sent = bool(
-                    result.get(
-                        "success",
-                        False,
-                    )
-                )
-
-                invoice.mydata_state = (
-                    "SENT"
-                    if invoice.sent
-                    else "PENDING"
-                )
+                invoice.sent = bool(result.get("success", False))
+                invoice.mydata_state = "SENT" if invoice.sent else "PENDING"
 
                 results.append(
                     {
