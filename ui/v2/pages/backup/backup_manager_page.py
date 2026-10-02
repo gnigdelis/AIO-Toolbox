@@ -153,11 +153,11 @@ class BackupManagerPage(QWidget):
         )
 
         self.server_label = QLabel(
-            "Server: —"
+            "Server: β€”"
         )
 
         self.udl_label = QLabel(
-            "UDL: —"
+            "UDL: β€”"
         )
 
         self.udl_label.setWordWrap(
@@ -333,6 +333,25 @@ class BackupManagerPage(QWidget):
         self.browse_button.setObjectName(
             "secondaryButton"
         )
+        self.browse_button.setStyleSheet(
+            """
+            QPushButton {
+                background: #2F6FED;
+                color: #FFFFFF;
+                border: 1px solid #2F6FED;
+            }
+
+            QPushButton:hover {
+                background: #245DCA;
+            }
+
+            QPushButton:disabled {
+                background: #F1F4F8;
+                color: #A8B2C0;
+                border-color: #E1E6ED;
+            }
+            """
+        )
 
         destination_layout.addWidget(
             destination_title
@@ -462,6 +481,25 @@ class BackupManagerPage(QWidget):
 
         self.save_schedule_button.setObjectName(
             "secondaryButton"
+        )
+        self.save_schedule_button.setStyleSheet(
+            """
+            QPushButton {
+                background: #2F6FED;
+                color: #FFFFFF;
+                border: 1px solid #2F6FED;
+            }
+
+            QPushButton:hover {
+                background: #245DCA;
+            }
+
+            QPushButton:disabled {
+                background: #F1F4F8;
+                color: #A8B2C0;
+                border-color: #E1E6ED;
+            }
+            """
         )
 
         schedule_layout.addWidget(
@@ -693,11 +731,11 @@ class BackupManagerPage(QWidget):
             )
 
             self.server_label.setText(
-                "Server: —"
+                "Server: β€”"
             )
 
             self.udl_label.setText(
-                "UDL: —"
+                "UDL: β€”"
             )
 
             self.backup_button.setEnabled(
@@ -732,7 +770,7 @@ class BackupManagerPage(QWidget):
                 database.get(
                     "path"
                 )
-                or "—"
+                or "β€”"
             )
         )
 
@@ -967,8 +1005,8 @@ class BackupManagerPage(QWidget):
 
         self.schedule_status_label.setText(
             "Scheduled backup is active"
-            f" • Every {interval} hours"
-            f" • Start: {start_time}"
+            f" β€Ά Every {interval} hours"
+            f" β€Ά Start: {start_time}"
         )
 
     # ================================================================

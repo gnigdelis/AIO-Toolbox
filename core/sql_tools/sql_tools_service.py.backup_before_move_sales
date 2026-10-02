@@ -4,9 +4,6 @@ from dataclasses import dataclass
 
 from core.database.database_connection import DatabaseConnection
 from core.database.database_context import database_context
-from core.move_sales_to_hist.move_sales_to_hist_service import (
-    MoveSalesToHistService,
-)
 
 
 @dataclass
@@ -437,92 +434,6 @@ class SQLToolsService:
                     connection.close()
                 except Exception:
                     pass
-
-    # ==============================================================
-    # MOVE SALES TO HIST
-    # ==============================================================
-
-    def get_active_sales_summary(self) -> dict:
-        """
-        Return the active sales summary used by Move Sales To Hist.
-        """
-
-        if not database_context.is_selected():
-            raise RuntimeError(
-                "??? ???? ???????? ?????? ???? ?????????."
-            )
-
-        service = MoveSalesToHistService()
-
-        return service.get_active_sales_summary()
-
-    def move_sales_to_hist(
-        self,
-        date_value: str,
-    ) -> SQLToolResult:
-        """
-        Move active sales to history using the existing
-        MoveSalesToHistService implementation.
-
-        The actual SQL operation remains:
-            dbo.SnProPOS_SalesTrHist
-        """
-
-        from datetime import datetime
-
-        try:
-            move_until = datetime.strptime(
-                date_value,
-                "%Y%m%d",
-            ).date()
-
-        except ValueError as exc:
-            raise RuntimeError(
-                "Invalid date. Expected format YYYYMMDD."
-            ) from exc
-
-        service = MoveSalesToHistService()
-
-        result = service.move_until(
-            move_until,
-        )
-
-        moved_count = int(
-            result.get(
-                "moved_count",
-                0,
-            )
-            or 0
-        )
-
-        database_name = (
-            result.get("database")
-            or "-"
-        )
-
-        server_name = (
-            result.get("server")
-            or "-"
-        )
-
-        if moved_count == 0:
-            message = (
-                "Move Sales To Hist ????????????. "
-                "??? ??????? ??????? ???????? ??? ????????."
-            )
-        else:
-            message = (
-                "Move Sales To Hist ???????????? ????????.\n"
-                f"Database: {database_name}\n"
-                f"Server: {server_name}\n"
-                f"???????????? ????????: {moved_count}"
-            )
-
-        return SQLToolResult(
-            success=True,
-            message=message,
-            affected_rows=moved_count,
-        )
 
     # ==============================================================
     # REBUILD DATABASE

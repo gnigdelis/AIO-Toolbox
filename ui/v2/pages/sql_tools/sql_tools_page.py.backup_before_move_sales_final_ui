@@ -936,55 +936,6 @@ class SQLToolsPage(QFrame):
             "Delete MyDATA Responses",
         )
 
-    def _delete_mydata_responses_before_date(self) -> None:
-        if not database_context.is_selected():
-            QMessageBox.warning(
-                self,
-                "Database Required",
-                "No database is selected.",
-            )
-            return
-
-        selected_date = self.delete_before_date_edit.date()
-
-        display_date = selected_date.toString(
-            "dd/MM/yyyy"
-        )
-
-        date_value = selected_date.toString(
-            "yyyyMMdd"
-        )
-
-        database = database_context.active() or {}
-        database_name = database.get("name", "-")
-
-        answer = QMessageBox.warning(
-            self,
-            "Delete MyDATA Responses Before Date",
-            (
-                "All records from TblSnMyDATA_Response "
-                "from the selected date and before will be deleted.\n\n"
-                f"Date: {display_date}\n"
-                f"Database: {database_name}\n\n"
-                "The selected date is included.\n"
-                "This action cannot be undone.\n\n"
-                "Do you want to continue?"
-            ),
-            QMessageBox.StandardButton.Yes
-            | QMessageBox.StandardButton.No,
-            QMessageBox.StandardButton.No,
-        )
-
-        if answer != QMessageBox.StandardButton.Yes:
-            return
-
-        self._start_operation(
-            "delete_mydata_before",
-            "Delete MyDATA Responses Before Date",
-            date_value,
-        )
-
-
     def _delete_failed_mydata_payments(self) -> None:
         if not database_context.is_selected():
             QMessageBox.warning(
@@ -1044,8 +995,7 @@ class SQLToolsPage(QFrame):
         today = date.today()
 
         self.move_sales_today_label.setText(
-            "\u03a3\u03b7\u03bc\u03b5\u03c1\u03b9\u03bd\u03ae "
-            "\u03b7\u03bc\u03b5\u03c1\u03bf\u03bc\u03b7\u03bd\u03af\u03b1: "
+            "???????? ???????\u0391\u03c0\u03cc: "
             f"{today.strftime('%d/%m/%Y')}"
         )
 
@@ -1055,13 +1005,11 @@ class SQLToolsPage(QFrame):
             self._sales_active_count = 0
 
             self.move_sales_latest_label.setText(
-                "\u03a4\u03b5\u03bb\u03b5\u03c5\u03c4\u03b1\u03af\u03b1 "
-                "\u03ba\u03af\u03bd\u03b7\u03c3\u03b7 \u03c3\u03c4\u03bf SalesTrans: -"
+                "\u03a4\u03b5\u03bb\u03b5\u03c5\u03c4\u03b1\u03af\u03b1 \u03ba\u03af\u03bd\u03b7\u03c3\u03b7 \u03c3\u03c4\u03bf SalesTrans: -"
             )
 
             self.move_sales_oldest_label.setText(
-                "\u03a0\u03b1\u03bb\u03b1\u03b9\u03cc\u03c4\u03b5\u03c1\u03b7 "
-                "\u03ba\u03af\u03bd\u03b7\u03c3\u03b7 \u03c3\u03c4\u03bf SalesTrans: -"
+                "?\u03a4\u03b5\u03bb\u03b5\u03c5\u03c4\u03b1\u03af\u03b1 \u03ba\u03af\u03bd\u03b7\u03c3\u03b7 \u03c3\u03c4\u03bf SalesTrans: -"
             )
 
             self.move_sales_button.setEnabled(False)
@@ -1089,8 +1037,7 @@ class SQLToolsPage(QFrame):
             )
 
             self.move_sales_latest_label.setText(
-                "\u03a4\u03b5\u03bb\u03b5\u03c5\u03c4\u03b1\u03af\u03b1 "
-                "\u03ba\u03af\u03bd\u03b7\u03c3\u03b7 \u03c3\u03c4\u03bf SalesTrans: "
+                "????????? ?????? ??? SalesTrans: "
                 + (
                     self._sales_latest_date.strftime(
                         "%d/%m/%Y"
@@ -1101,8 +1048,7 @@ class SQLToolsPage(QFrame):
             )
 
             self.move_sales_oldest_label.setText(
-                "\u03a0\u03b1\u03bb\u03b1\u03b9\u03cc\u03c4\u03b5\u03c1\u03b7 "
-                "\u03ba\u03af\u03bd\u03b7\u03c3\u03b7 \u03c3\u03c4\u03bf SalesTrans: "
+                "?????????? ?????? ??? SalesTrans: "
                 + (
                     self._sales_oldest_date.strftime(
                         "%d/%m/%Y"
@@ -1116,6 +1062,7 @@ class SQLToolsPage(QFrame):
                 self.move_sales_button.setEnabled(False)
                 self.move_sales_from_date_edit.setEnabled(False)
                 self.move_sales_until_date_edit.setEnabled(False)
+
                 return
 
             oldest_qdate = QDate(
@@ -1134,6 +1081,8 @@ class SQLToolsPage(QFrame):
                 else oldest_qdate
             )
 
+            # "From" is always the current oldest active
+            # SalesTrans record.
             self.move_sales_from_date_edit.setMinimumDate(
                 oldest_qdate
             )
@@ -1154,6 +1103,8 @@ class SQLToolsPage(QFrame):
                 False
             )
 
+            # Default batch: one month from the current oldest
+            # record, limited to the latest active record.
             proposed = self._add_sales_months(
                 self._sales_oldest_date,
                 1,
@@ -1183,6 +1134,8 @@ class SQLToolsPage(QFrame):
                 True
             )
 
+            # Always initialize a fresh batch from the current
+            # oldest SalesTrans record.
             self.move_sales_until_date_edit.setDate(
                 proposed_qdate
             )
@@ -1197,13 +1150,11 @@ class SQLToolsPage(QFrame):
 
         except Exception as exc:
             self.move_sales_latest_label.setText(
-                "\u03a4\u03b5\u03bb\u03b5\u03c5\u03c4\u03b1\u03af\u03b1 "
-                "\u03ba\u03af\u03bd\u03b7\u03c3\u03b7 \u03c3\u03c4\u03bf SalesTrans: Error"
+                "????????? ?????? ??? SalesTrans: Error"
             )
 
             self.move_sales_oldest_label.setText(
-                "\u03a0\u03b1\u03bb\u03b1\u03b9\u03cc\u03c4\u03b5\u03c1\u03b7 "
-                "\u03ba\u03af\u03bd\u03b7\u03c3\u03b7 \u03c3\u03c4\u03bf SalesTrans: Error"
+                "?\u03a4\u03b5\u03bb\u03b5\u03c5\u03c4\u03b1\u03af\u03b1 \u03ba\u03af\u03bd\u03b7\u03c3\u03b7 \u03c3\u03c4\u03bf SalesTrans: -"
             )
 
             self.move_sales_button.setEnabled(False)
@@ -1353,19 +1304,77 @@ class SQLToolsPage(QFrame):
             self,
             "Move Sales To Hist",
             (
-                "\u0397 \u03bc\u03b5\u03c4\u03b1\u03c6\u03bf\u03c1\u03ac "
-                "\u03b8\u03b1 \u03b5\u03ba\u03c4\u03b5\u03bb\u03ad\u03c3\u03b5\u03b9 "
-                "\u03b4\u03b9\u03b1\u03b4\u03b9\u03ba\u03b1\u03c3\u03af\u03b1 "
-                "\u03b1\u03c0\u03cc \u03c4\u03bf SalesTrans "
-                "\u03c3\u03c4\u03bf SalesTransHist.\n\n"
+                "?? ??????????? ???????? ??? ?? "
+                "SalesTrans ??? SalesTransHist.\n\n"
                 f"\u0391\u03c0\u03cc: {display_from}\n"
-                f"\u039c\u03ad\u03c7\u03c1\u03b9: {display_until}\n"
+                f"??\u0391\u03c0\u03cc: {display_until}\n"
                 f"Database: {database_name}\n\n"
-                "\u0397 \u03b4\u03b9\u03b1\u03b4\u03b9\u03ba\u03b1\u03c3\u03af\u03b1 "
-                "\u03b5\u03ba\u03c4\u03b5\u03bb\u03b5\u03af\u03c4\u03b1\u03b9 "
-                "\u03bc\u03ad\u03c3\u03c9 SQL Server stored procedure "
-                "dbo.SnProPOS_SalesTrHist.\n\n"
-                "\u0398\u03ad\u03bb\u03b5\u03b9\u03c2 \u03bd\u03b1 \u03c3\u03c5\u03bd\u03b5\u03c7\u03af\u03c3\u03b5\u03b9\u03c2;"
+                "? ???????? ??????? ????????? ???? ?? "
+                "??? ???????????? ?????????? ? ????.\n\n"
+                "? ???????? ??? ?????? ?? ?????????.\n\n"
+                "?????? ?? ??????????;"
+            ),
+            QMessageBox.StandardButton.Yes
+            | QMessageBox.StandardButton.No,
+            QMessageBox.StandardButton.No,
+        )
+
+        if answer != QMessageBox.StandardButton.Yes:
+            return
+
+        self._start_operation(
+            "move_sales_to_hist",
+            "Move Sales To Hist",
+            move_until,
+        )
+
+    def _move_sales_to_hist(self) -> None:
+        if not database_context.is_selected():
+            QMessageBox.warning(
+                self,
+                "Database Required",
+                "??? ???? ???????? ???? ?????????.",
+            )
+            return
+
+        if not self._sales_oldest_date:
+            QMessageBox.information(
+                self,
+                "Move Sales To Hist",
+                "??? ???????? ??????? ???????? "
+                "??? TblSnSalesTrans.",
+            )
+            return
+
+        selected = self.move_sales_date_edit.date()
+
+        move_until = selected.toString(
+            "yyyyMMdd"
+        )
+
+        display_date = selected.toString(
+            "dd/MM/yyyy"
+        )
+
+        database = database_context.active() or {}
+
+        database_name = database.get(
+            "name",
+            "-",
+        )
+
+        answer = QMessageBox.warning(
+            self,
+            "Move Sales To Hist",
+            (
+                "????????? ?? ??????????? ?? ?????????? "
+                "??????? ???????? ????? ??????? ?????????.\n\n"
+                f"Database: {database_name}\n"
+                f"Move Until: {display_date}\n\n"
+                "? ?????????? ?????????? ??? ?? SQL Server "
+                "stored procedure dbo.SnProPOS_SalesTrHist.\n\n"
+                "? ???????? ??? ?????? ?? ?????????.\n\n"
+                "?????? ?? ??????????;"
             ),
             QMessageBox.StandardButton.Yes
             | QMessageBox.StandardButton.No,
@@ -1454,6 +1463,54 @@ class SQLToolsPage(QFrame):
     # ------------------------------------------------------------------
     # Worker
     # ------------------------------------------------------------------
+
+    def _delete_mydata_responses_before_date(self) -> None:
+        if not database_context.is_selected():
+            QMessageBox.warning(
+                self,
+                "Database Required",
+                "No database is selected.",
+            )
+            return
+
+        selected_date = self.delete_before_date_edit.date()
+
+        display_date = selected_date.toString(
+            "dd/MM/yyyy"
+        )
+
+        date_value = selected_date.toString(
+            "yyyyMMdd"
+        )
+
+        database = database_context.active() or {}
+        database_name = database.get("name", "-")
+
+        answer = QMessageBox.warning(
+            self,
+            "Delete MyDATA Responses Before Date",
+            (
+                "All records from TblSnMyDATA_Response "
+                "from the selected date and before will be deleted.\n\n"
+                f"Date: {display_date}\n"
+                f"Database: {database_name}\n\n"
+                "The selected date is included.\n"
+                "This action cannot be undone.\n\n"
+                "Do you want to continue?"
+            ),
+            QMessageBox.StandardButton.Yes
+            | QMessageBox.StandardButton.No,
+            QMessageBox.StandardButton.No,
+        )
+
+        if answer != QMessageBox.StandardButton.Yes:
+            return
+
+        self._start_operation(
+            "delete_mydata_before",
+            "Delete MyDATA Responses Before Date",
+            date_value,
+        )
 
     def _start_operation(
         self,
@@ -1654,7 +1711,7 @@ class SQLToolsPage(QFrame):
                 enabled and sales_available
             )
 
-            self.move_sales_until_date_edit.setEnabled(
+            self.move_sales_date_edit.setEnabled(
                 enabled and sales_available
             )
 

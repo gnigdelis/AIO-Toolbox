@@ -333,16 +333,12 @@ class SQLToolsPage(QFrame):
             self.move_sales_card
         )
         move_sales_layout.setContentsMargins(
-            14, 18, 14, 16
+            14, 18, 14, 14
         )
-        move_sales_layout.setSpacing(12)
+        move_sales_layout.setSpacing(10)
 
-        # ----------------------------------------------------------
-        # Header
-        # ----------------------------------------------------------
-
-        move_sales_header = QHBoxLayout()
-        move_sales_header.setSpacing(12)
+        move_sales_top = QHBoxLayout()
+        move_sales_top.setSpacing(12)
 
         move_sales_text = QVBoxLayout()
         move_sales_text.setSpacing(5)
@@ -355,7 +351,9 @@ class SQLToolsPage(QFrame):
         )
 
         move_sales_description = QLabel(
-            "\u039c\u03b5\u03c4\u03b1\u03c6\u03ad\u03c1\u03b5\u03b9 \u03ba\u03b9\u03bd\u03ae\u03c3\u03b5\u03b9\u03c2 \u03b1\u03c0\u03cc \u03c4\u03bf SalesTrans \u03c3\u03c4\u03bf SalesTransHist."
+            "????????? ?????? ??????? ???????? ??? "
+            "TblSnSalesTrans ????? ??????? ????????? "
+            "???? ??? SQL Server stored procedure."
         )
         move_sales_description.setObjectName(
             "toolDescription"
@@ -369,7 +367,7 @@ class SQLToolsPage(QFrame):
             move_sales_description
         )
 
-        move_sales_header.addLayout(
+        move_sales_top.addLayout(
             move_sales_text,
             1,
         )
@@ -382,7 +380,7 @@ class SQLToolsPage(QFrame):
         )
         self.move_sales_button.setProperty(
             "buttonKind",
-            "primary",
+            "warning",
         )
         self.move_sales_button.setMinimumWidth(
             165
@@ -397,167 +395,137 @@ class SQLToolsPage(QFrame):
             self._move_sales_to_hist
         )
 
-        move_sales_header.addWidget(
+        move_sales_top.addWidget(
             self.move_sales_button,
             0,
             Qt.AlignmentFlag.AlignVCenter,
         )
 
         move_sales_layout.addLayout(
-            move_sales_header
+            move_sales_top
         )
-
-        # ----------------------------------------------------------
-        # Sales information
-        # ----------------------------------------------------------
 
         move_sales_info = QHBoxLayout()
-        move_sales_info.setSpacing(12)
+        move_sales_info.setSpacing(16)
 
-        self.move_sales_today_label = QLabel(
-            "\u03a3\u03b7\u03bc\u03b5\u03c1\u03b9\u03bd\u03ae \u03b7\u03bc\u03b5\u03c1\u03bf\u03bc\u03b7\u03bd\u03af\u03b1: -"
+        self.move_sales_count_label = QLabel(
+            "Active Sales: -"
         )
-
-        self.move_sales_latest_label = QLabel(
-            "\u03a4\u03b5\u03bb\u03b5\u03c5\u03c4\u03b1\u03af\u03b1 \u03ba\u03af\u03bd\u03b7\u03c3\u03b7 \u03c3\u03c4\u03bf SalesTrans: -"
-        )
-
         self.move_sales_oldest_label = QLabel(
-            "\u03a0\u03b1\u03bb\u03b1\u03b9\u03cc\u03c4\u03b5\u03c1\u03b7 \u03ba\u03af\u03bd\u03b7\u03c3\u03b7 \u03c3\u03c4\u03bf SalesTrans: -"
+            "Oldest: -"
+        )
+        self.move_sales_latest_label = QLabel(
+            "Latest: -"
         )
 
         for label in (
-            self.move_sales_today_label,
-            self.move_sales_latest_label,
+            self.move_sales_count_label,
             self.move_sales_oldest_label,
+            self.move_sales_latest_label,
         ):
             label.setObjectName(
-                "moveSalesInfo"
-            )
-            label.setMinimumHeight(
-                38
+                "toolDescription"
             )
 
         move_sales_info.addWidget(
-            self.move_sales_today_label,
-            1,
+            self.move_sales_count_label
         )
-
         move_sales_info.addWidget(
-            self.move_sales_latest_label,
-            1,
+            self.move_sales_oldest_label
         )
-
         move_sales_info.addWidget(
-            self.move_sales_oldest_label,
-            1,
+            self.move_sales_latest_label
         )
+        move_sales_info.addStretch()
 
         move_sales_layout.addLayout(
             move_sales_info
         )
 
-        # ----------------------------------------------------------
-        # Date range
-        # ----------------------------------------------------------
+        move_sales_controls = QHBoxLayout()
+        move_sales_controls.setSpacing(8)
 
-        range_title = QLabel(
-            "\u0395\u03c0\u03b9\u03bb\u03bf\u03b3\u03ae \u03b5\u03cd\u03c1\u03bf\u03c5\u03c2 \u03b7\u03bc\u03b5\u03c1\u03bf\u03bc\u03b7\u03bd\u03b9\u03ce\u03bd \u03b3\u03b9\u03b1 \u03bc\u03b5\u03c4\u03b1\u03c6\u03bf\u03c1\u03ac"
+        self.move_sales_one_month_button = QPushButton(
+            "1 Month"
         )
-        range_title.setObjectName(
-            "moveSalesRangeTitle"
+        self.move_sales_three_months_button = QPushButton(
+            "3 Months"
         )
-
-        move_sales_layout.addWidget(
-            range_title
+        self.move_sales_custom_button = QPushButton(
+            "Custom Date"
         )
 
-        move_sales_date_row = QHBoxLayout()
-        move_sales_date_row.setSpacing(10)
+        for button in (
+            self.move_sales_one_month_button,
+            self.move_sales_three_months_button,
+            self.move_sales_custom_button,
+        ):
+            button.setObjectName(
+                "secondaryButton"
+            )
+            button.setMinimumHeight(
+                34
+            )
+            button.setCursor(
+                Qt.CursorShape.PointingHandCursor
+            )
 
-        from_label = QLabel(
-            "\u0391\u03c0\u03cc:"
-        )
-        from_label.setObjectName(
-            "moveSalesDateLabel"
+        self.move_sales_one_month_button.clicked.connect(
+            self._move_sales_select_one_month
         )
 
-        self.move_sales_from_date_edit = QDateEdit()
-        self.move_sales_from_date_edit.setObjectName(
+        self.move_sales_three_months_button.clicked.connect(
+            self._move_sales_select_three_months
+        )
+
+        self.move_sales_custom_button.clicked.connect(
+            self._move_sales_select_custom
+        )
+
+        move_sales_controls.addWidget(
+            self.move_sales_one_month_button
+        )
+        move_sales_controls.addWidget(
+            self.move_sales_three_months_button
+        )
+        move_sales_controls.addWidget(
+            self.move_sales_custom_button
+        )
+
+        self.move_sales_date_edit = QDateEdit()
+        self.move_sales_date_edit.setObjectName(
             "toolDateEdit"
         )
-        self.move_sales_from_date_edit.setDisplayFormat(
+        self.move_sales_date_edit.setDisplayFormat(
             "dd/MM/yyyy"
         )
-        self.move_sales_from_date_edit.setCalendarPopup(
+        self.move_sales_date_edit.setCalendarPopup(
             True
         )
-        self.move_sales_from_date_edit.setMinimumWidth(
-            160
+        self.move_sales_date_edit.setMinimumWidth(
+            125
         )
-        self.move_sales_from_date_edit.setMinimumHeight(
-            36
+        self.move_sales_date_edit.setMinimumHeight(
+            34
         )
-
-        until_label = QLabel(
-            "\u039c\u03ad\u03c7\u03c1\u03b9:"
-        )
-        until_label.setObjectName(
-            "moveSalesDateLabel"
-        )
-
-        self.move_sales_until_date_edit = QDateEdit()
-        self.move_sales_until_date_edit.setObjectName(
-            "toolDateEdit"
-        )
-        self.move_sales_until_date_edit.setDisplayFormat(
-            "dd/MM/yyyy"
-        )
-        self.move_sales_until_date_edit.setCalendarPopup(
-            True
-        )
-        self.move_sales_until_date_edit.setMinimumWidth(
-            160
-        )
-        self.move_sales_until_date_edit.setMinimumHeight(
-            36
-        )
-
-        self.move_sales_until_date_edit.dateChanged.connect(
+        self.move_sales_date_edit.dateChanged.connect(
             self._move_sales_date_changed
         )
 
-        move_sales_date_row.addWidget(
-            from_label
+        move_sales_controls.addWidget(
+            QLabel("Move Until:")
         )
-
-        move_sales_date_row.addWidget(
-            self.move_sales_from_date_edit,
-            1,
-        )
-
-        move_sales_date_row.addSpacing(
-            16
-        )
-
-        move_sales_date_row.addWidget(
-            until_label
-        )
-
-        move_sales_date_row.addWidget(
-            self.move_sales_until_date_edit,
-            1,
+        move_sales_controls.addWidget(
+            self.move_sales_date_edit
         )
 
         move_sales_layout.addLayout(
-            move_sales_date_row
+            move_sales_controls
         )
 
         content_layout.addWidget(
             self.move_sales_card
         )
-
-        self._refresh_move_sales_summary()
 
         self._refresh_move_sales_summary()
 
@@ -655,46 +623,6 @@ class SQLToolsPage(QFrame):
                 font-size: 10px;
             }
 
-            QLabel#moveSalesInfo {
-                color: #526176;
-                font-size: 10px;
-                font-weight: 600;
-            }
-
-            QLabel#moveSalesDateLabel {
-                color: #526176;
-                font-size: 10px;
-                font-weight: 600;
-                min-width: 70px;
-            }
-
-            QPushButton#moveSalesPresetButton {
-                min-height: 36px;
-                padding: 0 12px;
-                background: #FFFFFF;
-                color: #40506A;
-                border: 1px solid #D8E1EC;
-                border-radius: 6px;
-                font-size: 10px;
-                font-weight: 600;
-            }
-
-            QPushButton#moveSalesPresetButton:hover {
-                background: #F4F7FB;
-                border-color: #BFCBDA;
-                color: #17233C;
-            }
-
-            QPushButton#moveSalesPresetButton:pressed {
-                background: #EAF1F8;
-            }
-
-            QPushButton#moveSalesPresetButton:disabled {
-                color: #A8B2C0;
-                background: #F1F4F8;
-                border-color: #E1E6ED;
-            }
-
             QPushButton#toolButton {
                 min-height: 36px;
                 min-width: 165px;
@@ -737,94 +665,7 @@ class SQLToolsPage(QFrame):
                 background: #F1F4F8;
                 border-color: #E1E6ED;
             }
-    
-            /* -------------------------------------------------------
-               SQL Tools - unified blue action buttons
-               ------------------------------------------------------- */
-
-            QPushButton#toolButton[buttonKind="danger"],
-            QPushButton#toolButton[buttonKind="warning"],
-            QPushButton#toolButton[buttonKind="primary"] {
-                background-color: #2F6FED;
-                color: #FFFFFF;
-                border: 1px solid #2F6FED;
-                border-radius: 6px;
-                font-size: 10px;
-                font-weight: 600;
-            }
-
-            QPushButton#toolButton[buttonKind="danger"]:hover,
-            QPushButton#toolButton[buttonKind="warning"]:hover,
-            QPushButton#toolButton[buttonKind="primary"]:hover {
-                background-color: #245ED0;
-                border-color: #245ED0;
-            }
-
-            QPushButton#toolButton[buttonKind="danger"]:pressed,
-            QPushButton#toolButton[buttonKind="warning"]:pressed,
-            QPushButton#toolButton[buttonKind="primary"]:pressed {
-                background-color: #1F52B8;
-                border-color: #1F52B8;
-            }
-
-            QPushButton#toolButton[buttonKind="danger"]:disabled,
-            QPushButton#toolButton[buttonKind="warning"]:disabled,
-            QPushButton#toolButton[buttonKind="primary"]:disabled {
-                background-color: #B9C8E3;
-                color: #FFFFFF;
-                border-color: #B9C8E3;
-            }
-
-            QPushButton#secondaryButton {
-                background-color: #2F6FED;
-                color: #FFFFFF;
-                border: 1px solid #2F6FED;
-                border-radius: 6px;
-                font-size: 10px;
-                font-weight: 600;
-            }
-
-            QPushButton#secondaryButton:hover {
-                background-color: #245ED0;
-                border-color: #245ED0;
-            }
-
-            QPushButton#secondaryButton:pressed {
-                background-color: #1F52B8;
-                border-color: #1F52B8;
-            }
-
-            QPushButton#secondaryButton:disabled {
-                background-color: #B9C8E3;
-                color: #FFFFFF;
-                border-color: #B9C8E3;
-            }
-
-            QLabel#moveSalesInfo {
-                color: #40506A;
-                background-color: #F4F7FC;
-                border: 1px solid #DCE5F2;
-                border-radius: 6px;
-                padding: 7px 10px;
-                font-size: 10px;
-                font-weight: 600;
-            }
-
-            QLabel#moveSalesRangeTitle {
-                color: #2F6FED;
-                font-size: 10px;
-                font-weight: 700;
-                padding-top: 2px;
-            }
-
-            QLabel#moveSalesDateLabel {
-                color: #40506A;
-                font-size: 10px;
-                font-weight: 600;
-                min-width: 45px;
-            }
-
-        """
+            """
         )
 
     # ------------------------------------------------------------------
@@ -936,55 +777,6 @@ class SQLToolsPage(QFrame):
             "Delete MyDATA Responses",
         )
 
-    def _delete_mydata_responses_before_date(self) -> None:
-        if not database_context.is_selected():
-            QMessageBox.warning(
-                self,
-                "Database Required",
-                "No database is selected.",
-            )
-            return
-
-        selected_date = self.delete_before_date_edit.date()
-
-        display_date = selected_date.toString(
-            "dd/MM/yyyy"
-        )
-
-        date_value = selected_date.toString(
-            "yyyyMMdd"
-        )
-
-        database = database_context.active() or {}
-        database_name = database.get("name", "-")
-
-        answer = QMessageBox.warning(
-            self,
-            "Delete MyDATA Responses Before Date",
-            (
-                "All records from TblSnMyDATA_Response "
-                "from the selected date and before will be deleted.\n\n"
-                f"Date: {display_date}\n"
-                f"Database: {database_name}\n\n"
-                "The selected date is included.\n"
-                "This action cannot be undone.\n\n"
-                "Do you want to continue?"
-            ),
-            QMessageBox.StandardButton.Yes
-            | QMessageBox.StandardButton.No,
-            QMessageBox.StandardButton.No,
-        )
-
-        if answer != QMessageBox.StandardButton.Yes:
-            return
-
-        self._start_operation(
-            "delete_mydata_before",
-            "Delete MyDATA Responses Before Date",
-            date_value,
-        )
-
-
     def _delete_failed_mydata_payments(self) -> None:
         if not database_context.is_selected():
             QMessageBox.warning(
@@ -1039,34 +831,26 @@ class SQLToolsPage(QFrame):
         ):
             return
 
-        from datetime import date
-
-        today = date.today()
-
-        self.move_sales_today_label.setText(
-            "\u03a3\u03b7\u03bc\u03b5\u03c1\u03b9\u03bd\u03ae "
-            "\u03b7\u03bc\u03b5\u03c1\u03bf\u03bc\u03b7\u03bd\u03af\u03b1: "
-            f"{today.strftime('%d/%m/%Y')}"
-        )
-
         if not database_context.is_selected():
             self._sales_oldest_date = None
             self._sales_latest_date = None
             self._sales_active_count = 0
 
-            self.move_sales_latest_label.setText(
-                "\u03a4\u03b5\u03bb\u03b5\u03c5\u03c4\u03b1\u03af\u03b1 "
-                "\u03ba\u03af\u03bd\u03b7\u03c3\u03b7 \u03c3\u03c4\u03bf SalesTrans: -"
+            self.move_sales_count_label.setText(
+                "Active Sales: -"
             )
-
             self.move_sales_oldest_label.setText(
-                "\u03a0\u03b1\u03bb\u03b1\u03b9\u03cc\u03c4\u03b5\u03c1\u03b7 "
-                "\u03ba\u03af\u03bd\u03b7\u03c3\u03b7 \u03c3\u03c4\u03bf SalesTrans: -"
+                "Oldest: -"
+            )
+            self.move_sales_latest_label.setText(
+                "Latest: -"
             )
 
             self.move_sales_button.setEnabled(False)
-            self.move_sales_from_date_edit.setEnabled(False)
-            self.move_sales_until_date_edit.setEnabled(False)
+            self.move_sales_one_month_button.setEnabled(False)
+            self.move_sales_three_months_button.setEnabled(False)
+            self.move_sales_custom_button.setEnabled(False)
+            self.move_sales_date_edit.setEnabled(False)
 
             return
 
@@ -1088,21 +872,12 @@ class SQLToolsPage(QFrame):
                 summary.get("latest_date")
             )
 
-            self.move_sales_latest_label.setText(
-                "\u03a4\u03b5\u03bb\u03b5\u03c5\u03c4\u03b1\u03af\u03b1 "
-                "\u03ba\u03af\u03bd\u03b7\u03c3\u03b7 \u03c3\u03c4\u03bf SalesTrans: "
-                + (
-                    self._sales_latest_date.strftime(
-                        "%d/%m/%Y"
-                    )
-                    if self._sales_latest_date
-                    else "-"
-                )
+            self.move_sales_count_label.setText(
+                f"Active Sales: {self._sales_active_count:,}"
             )
 
             self.move_sales_oldest_label.setText(
-                "\u03a0\u03b1\u03bb\u03b1\u03b9\u03cc\u03c4\u03b5\u03c1\u03b7 "
-                "\u03ba\u03af\u03bd\u03b7\u03c3\u03b7 \u03c3\u03c4\u03bf SalesTrans: "
+                "Oldest: "
                 + (
                     self._sales_oldest_date.strftime(
                         "%d/%m/%Y"
@@ -1112,47 +887,42 @@ class SQLToolsPage(QFrame):
                 )
             )
 
+            self.move_sales_latest_label.setText(
+                "Latest: "
+                + (
+                    self._sales_latest_date.strftime(
+                        "%d/%m/%Y"
+                    )
+                    if self._sales_latest_date
+                    else "-"
+                )
+            )
+
             if not self._sales_oldest_date:
                 self.move_sales_button.setEnabled(False)
-                self.move_sales_from_date_edit.setEnabled(False)
-                self.move_sales_until_date_edit.setEnabled(False)
+                self.move_sales_one_month_button.setEnabled(False)
+                self.move_sales_three_months_button.setEnabled(False)
+                self.move_sales_custom_button.setEnabled(False)
+                self.move_sales_date_edit.setEnabled(False)
+
                 return
 
-            oldest_qdate = QDate(
-                self._sales_oldest_date.year,
-                self._sales_oldest_date.month,
-                self._sales_oldest_date.day,
-            )
-
-            latest_qdate = (
+            self.move_sales_date_edit.setMinimumDate(
                 QDate(
-                    self._sales_latest_date.year,
-                    self._sales_latest_date.month,
-                    self._sales_latest_date.day,
+                    self._sales_oldest_date.year,
+                    self._sales_oldest_date.month,
+                    self._sales_oldest_date.day,
                 )
-                if self._sales_latest_date
-                else oldest_qdate
             )
 
-            self.move_sales_from_date_edit.setMinimumDate(
-                oldest_qdate
-            )
-
-            self.move_sales_from_date_edit.setMaximumDate(
-                latest_qdate
-            )
-
-            self.move_sales_from_date_edit.blockSignals(
-                True
-            )
-
-            self.move_sales_from_date_edit.setDate(
-                oldest_qdate
-            )
-
-            self.move_sales_from_date_edit.blockSignals(
-                False
-            )
+            if self._sales_latest_date:
+                self.move_sales_date_edit.setMaximumDate(
+                    QDate(
+                        self._sales_latest_date.year,
+                        self._sales_latest_date.month,
+                        self._sales_latest_date.day,
+                    )
+                )
 
             proposed = self._add_sales_months(
                 self._sales_oldest_date,
@@ -1165,50 +935,36 @@ class SQLToolsPage(QFrame):
             ):
                 proposed = self._sales_latest_date
 
-            proposed_qdate = QDate(
-                proposed.year,
-                proposed.month,
-                proposed.day,
-            )
-
-            self.move_sales_until_date_edit.setMinimumDate(
-                oldest_qdate
-            )
-
-            self.move_sales_until_date_edit.setMaximumDate(
-                latest_qdate
-            )
-
-            self.move_sales_until_date_edit.blockSignals(
-                True
-            )
-
-            self.move_sales_until_date_edit.setDate(
-                proposed_qdate
-            )
-
-            self.move_sales_until_date_edit.blockSignals(
-                False
+            self.move_sales_date_edit.setDate(
+                QDate(
+                    proposed.year,
+                    proposed.month,
+                    proposed.day,
+                )
             )
 
             self.move_sales_button.setEnabled(True)
-            self.move_sales_from_date_edit.setEnabled(True)
-            self.move_sales_until_date_edit.setEnabled(True)
+            self.move_sales_one_month_button.setEnabled(True)
+            self.move_sales_three_months_button.setEnabled(True)
+            self.move_sales_custom_button.setEnabled(True)
+            self.move_sales_date_edit.setEnabled(True)
 
         except Exception as exc:
-            self.move_sales_latest_label.setText(
-                "\u03a4\u03b5\u03bb\u03b5\u03c5\u03c4\u03b1\u03af\u03b1 "
-                "\u03ba\u03af\u03bd\u03b7\u03c3\u03b7 \u03c3\u03c4\u03bf SalesTrans: Error"
+            self.move_sales_count_label.setText(
+                "Active Sales: Error"
             )
-
             self.move_sales_oldest_label.setText(
-                "\u03a0\u03b1\u03bb\u03b1\u03b9\u03cc\u03c4\u03b5\u03c1\u03b7 "
-                "\u03ba\u03af\u03bd\u03b7\u03c3\u03b7 \u03c3\u03c4\u03bf SalesTrans: Error"
+                "Oldest: -"
+            )
+            self.move_sales_latest_label.setText(
+                "Latest: -"
             )
 
             self.move_sales_button.setEnabled(False)
-            self.move_sales_from_date_edit.setEnabled(False)
-            self.move_sales_until_date_edit.setEnabled(False)
+            self.move_sales_one_month_button.setEnabled(False)
+            self.move_sales_three_months_button.setEnabled(False)
+            self.move_sales_custom_button.setEnabled(False)
+            self.move_sales_date_edit.setEnabled(False)
 
             self.log_label.setText(
                 "Move Sales To Hist summary error:\n"
@@ -1253,6 +1009,78 @@ class SQLToolsPage(QFrame):
             day,
         )
 
+    def _set_move_sales_date(
+        self,
+        value,
+    ) -> None:
+        if not self._sales_oldest_date:
+            return
+
+        if value < self._sales_oldest_date:
+            value = self._sales_oldest_date
+
+        if (
+            self._sales_latest_date
+            and value > self._sales_latest_date
+        ):
+            value = self._sales_latest_date
+
+        self.move_sales_date_edit.blockSignals(True)
+
+        self.move_sales_date_edit.setDate(
+            QDate(
+                value.year,
+                value.month,
+                value.day,
+            )
+        )
+
+        self.move_sales_date_edit.blockSignals(False)
+
+    def _move_sales_select_one_month(self) -> None:
+        if not self._sales_oldest_date:
+            return
+
+        target = self._add_sales_months(
+            self._sales_oldest_date,
+            1,
+        )
+
+        self._set_move_sales_date(target)
+
+        self.log_label.setText(
+            "?????????? ???????? 1 ???? "
+            "??? ??? ?????????? ?????? ??????."
+        )
+
+    def _move_sales_select_three_months(self) -> None:
+        if not self._sales_oldest_date:
+            return
+
+        target = self._add_sales_months(
+            self._sales_oldest_date,
+            3,
+        )
+
+        self._set_move_sales_date(target)
+
+        self.log_label.setText(
+            "?????????? ???????? 3 ????? "
+            "??? ??? ?????????? ?????? ??????."
+        )
+
+    def _move_sales_select_custom(self) -> None:
+        if not self._sales_oldest_date:
+            return
+
+        self.move_sales_date_edit.setFocus()
+        self.move_sales_date_edit.calendarWidget().show()
+
+        self.log_label.setText(
+            "??????? ??? ?????????? ????? ??? ????? "
+            "?????? ?? ??????????? ?? ????????."
+        )
+
     def _move_sales_date_changed(
         self,
         qdate: QDate,
@@ -1269,42 +1097,17 @@ class SQLToolsPage(QFrame):
         )
 
         if selected < self._sales_oldest_date:
-            self.move_sales_until_date_edit.blockSignals(
-                True
+            self._set_move_sales_date(
+                self._sales_oldest_date
             )
-
-            self.move_sales_until_date_edit.setDate(
-                QDate(
-                    self._sales_oldest_date.year,
-                    self._sales_oldest_date.month,
-                    self._sales_oldest_date.day,
-                )
-            )
-
-            self.move_sales_until_date_edit.blockSignals(
-                False
-            )
-
             return
 
         if (
             self._sales_latest_date
             and selected > self._sales_latest_date
         ):
-            self.move_sales_until_date_edit.blockSignals(
-                True
-            )
-
-            self.move_sales_until_date_edit.setDate(
-                QDate(
-                    self._sales_latest_date.year,
-                    self._sales_latest_date.month,
-                    self._sales_latest_date.day,
-                )
-            )
-
-            self.move_sales_until_date_edit.blockSignals(
-                False
+            self._set_move_sales_date(
+                self._sales_latest_date
             )
 
     def _move_sales_to_hist(self) -> None:
@@ -1312,7 +1115,7 @@ class SQLToolsPage(QFrame):
             QMessageBox.warning(
                 self,
                 "Database Required",
-                "\u0394\u03b5\u03bd \u03ad\u03c7\u03b5\u03b9 \u03b5\u03c0\u03b9\u03bb\u03b5\u03b3\u03b5\u03af \u03b5\u03bd\u03b5\u03c1\u03b3\u03ae \u03b2\u03ac\u03c3\u03b7 \u03b4\u03b5\u03b4\u03bf\u03bc\u03ad\u03bd\u03c9\u03bd.",
+                "??? ???? ???????? ???? ?????????.",
             )
             return
 
@@ -1320,25 +1123,18 @@ class SQLToolsPage(QFrame):
             QMessageBox.information(
                 self,
                 "Move Sales To Hist",
-                "\u0394\u03b5\u03bd \u03c5\u03c0\u03ac\u03c1\u03c7\u03bf\u03c5\u03bd \u03b5\u03bd\u03b5\u03c1\u03b3\u03ad\u03c2 \u03ba\u03b9\u03bd\u03ae\u03c3\u03b5\u03b9\u03c2 \u03c3\u03c4\u03bf SalesTrans.",
+                "??? ???????? ??????? ???????? "
+                "??? TblSnSalesTrans.",
             )
             return
 
-        selected = (
-            self.move_sales_until_date_edit.date()
-        )
+        selected = self.move_sales_date_edit.date()
 
         move_until = selected.toString(
             "yyyyMMdd"
         )
 
-        display_from = (
-            self._sales_oldest_date.strftime(
-                "%d/%m/%Y"
-            )
-        )
-
-        display_until = selected.toString(
+        display_date = selected.toString(
             "dd/MM/yyyy"
         )
 
@@ -1353,19 +1149,14 @@ class SQLToolsPage(QFrame):
             self,
             "Move Sales To Hist",
             (
-                "\u0397 \u03bc\u03b5\u03c4\u03b1\u03c6\u03bf\u03c1\u03ac "
-                "\u03b8\u03b1 \u03b5\u03ba\u03c4\u03b5\u03bb\u03ad\u03c3\u03b5\u03b9 "
-                "\u03b4\u03b9\u03b1\u03b4\u03b9\u03ba\u03b1\u03c3\u03af\u03b1 "
-                "\u03b1\u03c0\u03cc \u03c4\u03bf SalesTrans "
-                "\u03c3\u03c4\u03bf SalesTransHist.\n\n"
-                f"\u0391\u03c0\u03cc: {display_from}\n"
-                f"\u039c\u03ad\u03c7\u03c1\u03b9: {display_until}\n"
-                f"Database: {database_name}\n\n"
-                "\u0397 \u03b4\u03b9\u03b1\u03b4\u03b9\u03ba\u03b1\u03c3\u03af\u03b1 "
-                "\u03b5\u03ba\u03c4\u03b5\u03bb\u03b5\u03af\u03c4\u03b1\u03b9 "
-                "\u03bc\u03ad\u03c3\u03c9 SQL Server stored procedure "
-                "dbo.SnProPOS_SalesTrHist.\n\n"
-                "\u0398\u03ad\u03bb\u03b5\u03b9\u03c2 \u03bd\u03b1 \u03c3\u03c5\u03bd\u03b5\u03c7\u03af\u03c3\u03b5\u03b9\u03c2;"
+                "????????? ?? ??????????? ?? ?????????? "
+                "??????? ???????? ????? ??????? ?????????.\n\n"
+                f"Database: {database_name}\n"
+                f"Move Until: {display_date}\n\n"
+                "? ?????????? ?????????? ??? ?? SQL Server "
+                "stored procedure dbo.SnProPOS_SalesTrHist.\n\n"
+                "? ???????? ??? ?????? ?? ?????????.\n\n"
+                "?????? ?? ??????????;"
             ),
             QMessageBox.StandardButton.Yes
             | QMessageBox.StandardButton.No,
@@ -1454,6 +1245,54 @@ class SQLToolsPage(QFrame):
     # ------------------------------------------------------------------
     # Worker
     # ------------------------------------------------------------------
+
+    def _delete_mydata_responses_before_date(self) -> None:
+        if not database_context.is_selected():
+            QMessageBox.warning(
+                self,
+                "Database Required",
+                "No database is selected.",
+            )
+            return
+
+        selected_date = self.delete_before_date_edit.date()
+
+        display_date = selected_date.toString(
+            "dd/MM/yyyy"
+        )
+
+        date_value = selected_date.toString(
+            "yyyyMMdd"
+        )
+
+        database = database_context.active() or {}
+        database_name = database.get("name", "-")
+
+        answer = QMessageBox.warning(
+            self,
+            "Delete MyDATA Responses Before Date",
+            (
+                "All records from TblSnMyDATA_Response "
+                "from the selected date and before will be deleted.\n\n"
+                f"Date: {display_date}\n"
+                f"Database: {database_name}\n\n"
+                "The selected date is included.\n"
+                "This action cannot be undone.\n\n"
+                "Do you want to continue?"
+            ),
+            QMessageBox.StandardButton.Yes
+            | QMessageBox.StandardButton.No,
+            QMessageBox.StandardButton.No,
+        )
+
+        if answer != QMessageBox.StandardButton.Yes:
+            return
+
+        self._start_operation(
+            "delete_mydata_before",
+            "Delete MyDATA Responses Before Date",
+            date_value,
+        )
 
     def _start_operation(
         self,
@@ -1654,7 +1493,7 @@ class SQLToolsPage(QFrame):
                 enabled and sales_available
             )
 
-            self.move_sales_until_date_edit.setEnabled(
+            self.move_sales_date_edit.setEnabled(
                 enabled and sales_available
             )
 

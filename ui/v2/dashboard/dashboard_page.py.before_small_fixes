@@ -286,7 +286,7 @@ class WelcomePanel(QFrame):
             )
 
             check = QLabel(
-                "ΞΒΞ’Β²Ξβ€™Ξ’ΒΞΒ²Ξ²β€Β¬Ξ’Β"
+                "β“"
             )
 
             check.setObjectName(
@@ -1095,7 +1095,7 @@ class DashboardPage(QWidget):
         )
 
         dot = QLabel(
-            chr(0x25CF)
+            "β—"
         )
 
         dot.setObjectName(
@@ -1401,7 +1401,7 @@ class DashboardPage(QWidget):
         )
 
         logs = QLabel(
-            "View Logs  " + chr(0x2192)
+            "View Logs  β†’"
         )
 
         logs.setObjectName(
@@ -1529,7 +1529,7 @@ class DashboardPage(QWidget):
         )
 
         dot = QLabel(
-            chr(0x25CF)
+            "β—"
         )
 
         dot.setObjectName(
@@ -1578,6 +1578,7 @@ class DashboardPage(QWidget):
     # ==================================================================
     # RESPONSIVE
     # ==================================================================
+
     def _apply_responsive_layout(
         self,
     ) -> None:
@@ -1929,7 +1930,10 @@ class DashboardPage(QWidget):
 
                 if name:
 
-                    return name
+                    return (
+                        f"{name} "
+                        f"({release})"
+                    )
 
                 return (
                     f"Windows "
@@ -2140,7 +2144,7 @@ class DashboardPage(QWidget):
             )
 
             return (
-                f"{drive}  ΞΒΞ’Β²ΞΒ²Ξ²β‚¬ΒΞ’Β¬ΞΒΞ²β‚¬Β   "
+                f"{drive}  β€Ά  "
                 f"{free_gb:.1f} GB free of "
                 f"{total_gb:.1f} GB "
                 f"({used_percent:.0f}% used)"

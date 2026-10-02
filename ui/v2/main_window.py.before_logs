@@ -1,4 +1,4 @@
-from pathlib import Path
+﻿from pathlib import Path
 import json
 import urllib.request
 
@@ -928,7 +928,9 @@ class MainWindow(QMainWindow):
         icon_label.setPixmap(
             pixmap(
                 icon_name,
-                "#26344D",
+                "#FFFFFF"
+                if selected
+                else "#26344D",
                 19,
             )
         )
@@ -1013,7 +1015,9 @@ class MainWindow(QMainWindow):
                     icon_widget.setPixmap(
                         pixmap(
                             current_icon_name,
-                            "#26344D",
+                            "#FFFFFF"
+                            if is_selected
+                            else "#26344D",
                             19,
                         )
                     )
@@ -1617,10 +1621,6 @@ class MainWindow(QMainWindow):
 
         self.pages.addWidget(
             self.dashboard_page
-        )
-
-        self.dashboard_page.logs_requested.connect(
-            lambda: self._show_page("logs")
         )
 
         self.pages.addWidget(
